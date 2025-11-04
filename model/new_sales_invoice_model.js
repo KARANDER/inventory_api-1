@@ -174,6 +174,45 @@ const Invoice = {
         }
       }
 
+      // --- NEW: Update customer reference numbers (no_1 and no_2) ---
+    const { reference_no_1, reference_no_2 } = invoiceData;
+    if (customer_id && (reference_no_1 || reference_no_2)) {
+      // Step 1: Find contact ID from contacts table using customer_id
+      const [contactRows] = await connection.query(
+        'SELECT id FROM contacts WHERE code = ? LIMIT 1',
+        [customer_id]
+      );
+      
+      if (contactRows.length > 0) {
+        const contactId = contactRows[0].id;
+        
+        // Step 2: Update no_1 and no_2 in customer_details table
+        const updateFields = [];
+        const updateValues = [];
+        
+        if (reference_no_1 !== null && reference_no_1 !== undefined) {
+          updateFields.push('no_1 = COALESCE(no_1, 0) + ?');
+          updateValues.push(reference_no_1);
+        }
+        
+        if (reference_no_2 !== null && reference_no_2 !== undefined) {
+          updateFields.push('no_2 = COALESCE(no_2, 0) + ?');
+          updateValues.push(reference_no_2);
+        }
+        
+        if (updateFields.length > 0) {
+          updateValues.push(contactId);
+          const updateReferenceQuery = `
+            UPDATE customer_details 
+            SET ${updateFields.join(', ')} 
+            WHERE contact_id = ?
+          `;
+          await connection.query(updateReferenceQuery, updateValues);
+        }
+      }
+    }
+
+
       await connection.commit();
       return { id: newInvoiceId, ...invoiceData };
 
