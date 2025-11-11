@@ -40,9 +40,22 @@ const Invoice = {
       // 1. Insert into invoices table (Unchanged)
       const invoiceFields = [
         'invoice_number', 'invoice_date', 'customer_id', 'reference_no_1',
-        'reference_no_2', 'sub_total', 'gst_amount', 'grand_total', 'tr_number', 'lr_number'
+        'reference_no_2', 'sub_total', 'gst_amount', 'grand_total', 'tr_number', 'lr_number',
+        'remaining_amount' // Added new field
       ];
-      const invoiceValues = invoiceFields.map(field => invoiceData[field] || null);
+     const invoiceValues = [
+        invoiceData.invoice_number || null,
+        invoiceData.invoice_date || null,
+        invoiceData.customer_id || null,
+        invoiceData.reference_no_1 || null,
+        invoiceData.reference_no_2 || null,
+        invoiceData.sub_total || 0,
+        invoiceData.gst_amount || 0,
+        invoiceData.grand_total || 0,
+        invoiceData.tr_number || null,
+        invoiceData.lr_number || null,
+        invoiceData.grand_total || 0 // Set remaining_amount = grand_total
+      ];
       const invoiceQuery = `INSERT INTO invoices (${invoiceFields.join(', ')}) VALUES (?)`;
       const [invoiceResult] = await connection.query(invoiceQuery, [invoiceValues]);
       const newInvoiceId = invoiceResult.insertId;
@@ -307,7 +320,8 @@ const Invoice = {
     const query = `
       SELECT 
         i.id, i.invoice_number AS invoiceNo, i.invoice_date, i.customer_id,
-        i.reference_no_1 AS No1, i.reference_no_2 AS No2, cd.credit_period
+        i.reference_no_1 AS No1, i.reference_no_2 AS No2, cd.credit_period,
+        i.remaining_amount
       FROM invoices i
       LEFT JOIN contacts c ON i.customer_id = c.code
       LEFT JOIN customer_details cd ON c.id = cd.contact_id
@@ -337,8 +351,90 @@ const Invoice = {
         id: row.id, invoiceNo: row.invoiceNo, cutomer_id: row.customer_id, daysElapsed,
         creditDays, daysLeft: daysLeft >= 0 ? daysLeft : 0, daysOverdue, status,
         No1: row.No1 || 0, No2: row.No2 || 0, No1_plus_No2: parseNumber(row.No1) + parseNumber(row.No2),
+        remaining_amount: parseNumber(row.remaining_amount)
       };
     });
+  },
+  // Add this new function inside the Invoice object, for example, after getInvoiceSummary.
+
+  getStatementByCustomerId: async (customerId) => {
+    const connection = await db.getConnection();
+    try {
+      // Step 1: Get all invoices for the customer, with their overdue days
+      const sqlQuery = `
+        SELECT 
+          customer_id,
+          invoice_date AS data, 
+          invoice_number,
+          invoice_number AS description, 
+          grand_total,
+          remaining_amount AS remaining_balance,
+          DATEDIFF(NOW(), invoice_date) AS overdue_days
+        FROM 
+          invoices
+        WHERE 
+          customer_id = ? 
+        ORDER BY 
+          invoice_date ASC
+      `;
+
+      const [invoiceRows] = await connection.query(sqlQuery, [customerId]);
+
+      // Step 2: Create the aging summary object with all 6 fields
+      const agingSummary = {
+        "current_balance": 0,
+        "overdue_1_30": 0,
+        "overdue_31_60": 0,
+        "overdue_61_90": 0,
+        "overdue_90_plus": 0,
+        "total_balance": 0
+      };
+
+      const parseNumber = (val) => {
+        const num = parseFloat(val);
+        return isNaN(num) ? 0 : num;
+      };
+
+      // Step 3: Loop through invoices to calculate all summary totals
+      for (const invoice of invoiceRows) {
+        const balance = parseNumber(invoice.remaining_balance);
+        const days = parseInt(invoice.overdue_days, 10) || 0;
+
+        // Add to the grand total every time
+        agingSummary.total_balance += balance;
+
+        // Sort into the correct bucket
+        if (days <= 0) {
+          agingSummary.current_balance += balance;
+        } else if (days >= 1 && days <= 30) {
+          agingSummary.overdue_1_30 += balance;
+        } else if (days >= 31 && days <= 60) {
+          agingSummary.overdue_31_60 += balance;
+        } else if (days >= 61 && days <= 90) {
+          agingSummary.overdue_61_90 += balance;
+        } else if (days > 90) {
+          agingSummary.overdue_90_plus += balance;
+        }
+      }
+
+      // Format summary to 2 decimal places
+      for (const key in agingSummary) {
+        agingSummary[key] = parseFloat(agingSummary[key].toFixed(2));
+      }
+
+      // Step 4: Return both the list and the summary
+      return {
+        invoice_list: invoiceRows,
+        aging_summary: agingSummary
+      };
+
+    } catch (error)
+      {
+      console.error("Error in getStatementByCustomerId:", error);
+      throw error;
+    } finally {
+      if (connection) connection.release();
+    }
   },
 };
 

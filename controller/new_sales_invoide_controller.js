@@ -72,6 +72,26 @@ const invoiceController = {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   },
+  // Add this new function inside the invoiceController object
+
+  getStatement: async (req, res) => {
+    try {
+      const { customer_id } = req.body; // Get customer_id from query params (e.g., /api/statement?customer_id=CUST-003)
+      
+      if (!customer_id) {
+        return res.status(400).json({ success: false, message: 'Customer ID is required.' });
+      }
+      
+      const statementData = await Invoice.getStatementByCustomerId(customer_id);
+      res.status(200).json({ success: true, data: statementData });
+      
+    } catch (error) {
+      if (error.message === 'Customer not found.') {
+        return res.status(404).json({ success: false, message: error.message });
+      }
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
 };
 
 module.exports = invoiceController;

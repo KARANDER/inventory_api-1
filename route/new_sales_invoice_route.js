@@ -19,5 +19,6 @@ router.post(
   [authMiddleware, checkPermission('sales_invoices')],
   invoiceController.getInvoiceSummary
 );
+router.post('/statement', invoiceController.getStatement);
 
 module.exports = router;
