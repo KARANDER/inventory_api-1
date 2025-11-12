@@ -78,8 +78,17 @@ const Contact = {
             c.*,
             cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
             cd.place_of_supply, cd.reverse_charge, cd.type_of_registration, cd.total_amount,
-            cd.notes, cd.payment, cd.date, cd.order_follow_up,cd.no_1,cd.no_2,
-            sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note
+            cd.notes, cd.payment, cd.date, cd.order_follow_up, cd.no_1, cd.no_2,
+            sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note,
+            COALESCE(
+                (
+                    SELECT remaining_amount
+                    FROM invoices
+                    WHERE customer_id = c.code AND remaining_amount > 0
+                    ORDER BY id DESC
+                    LIMIT 1
+                ), 0
+            ) as remaining_balance
         FROM contacts c
         LEFT JOIN customer_details cd ON c.id = cd.contact_id
         LEFT JOIN supplier_details sd ON c.id = sd.contact_id
