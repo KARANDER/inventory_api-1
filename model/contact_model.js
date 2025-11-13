@@ -82,13 +82,31 @@ const Contact = {
             sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note,
             COALESCE(
                 (
-                    SELECT remaining_amount
-                    FROM invoices
-                    WHERE customer_id = c.code AND remaining_amount > 0
-                    ORDER BY id DESC
+                    SELECT DATEDIFF(CURDATE(), i.invoice_date)
+                    FROM invoices i
+                    WHERE i.customer_id = c.code
+                    AND i.remaining_amount > 0
+                    ORDER BY i.created_at DESC, i.id DESC
                     LIMIT 1
-                ), 0
-            ) as remaining_balance
+                ),
+                0
+            ) AS overdue_days,
+            (
+                SELECT i.invoice_number
+                FROM invoices i
+                WHERE i.customer_id = c.code
+                AND i.remaining_amount > 0
+                ORDER BY i.created_at DESC, i.id DESC
+                LIMIT 1
+            ) AS invoice_number,
+            (
+                SELECT i.remaining_amount
+                FROM invoices i
+                WHERE i.customer_id = c.code
+                AND i.remaining_amount > 0
+                ORDER BY i.created_at DESC, i.id DESC
+                LIMIT 1
+            ) AS remaining_amount
         FROM contacts c
         LEFT JOIN customer_details cd ON c.id = cd.contact_id
         LEFT JOIN supplier_details sd ON c.id = sd.contact_id
