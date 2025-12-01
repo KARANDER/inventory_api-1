@@ -1,4 +1,5 @@
 const Contact = require('../model/contact_model');
+const { logUserActivity } = require('../utils/activityLogger');
 
 const contactController = {
   createContact: async (req, res) => {
@@ -17,6 +18,12 @@ const contactController = {
       };
 
       const newContact = await Contact.create(contactData);
+      await logUserActivity(req, {
+        model_name: 'contacts',
+        action_type: 'CREATE',
+        record_id: newContact.id,
+        description: 'Created contact'
+      });
       res.status(201).json({ success: true, data: newContact });
     } catch (error) {
       console.error("Create Contact Error:", error);
@@ -49,6 +56,12 @@ const contactController = {
 
       const updatedContact = await Contact.update(id, req.body);
 
+      await logUserActivity(req, {
+        model_name: 'contacts',
+        action_type: 'UPDATE',
+        record_id: id,
+        description: 'Updated contact'
+      });
       res.status(200).json({ success: true, message: 'Contact updated successfully.', data: updatedContact });
     } catch (error) {
       console.error('Update Contact Error:', error);
@@ -65,6 +78,12 @@ const contactController = {
 
       await Contact.delete(id);
 
+      await logUserActivity(req, {
+        model_name: 'contacts',
+        action_type: 'DELETE',
+        record_id: id,
+        description: 'Deleted contact'
+      });
       res.status(200).json({ success: true, message: 'Contact deleted successfully.' });
     } catch (error) {
       console.error('Delete Contact Error:', error);

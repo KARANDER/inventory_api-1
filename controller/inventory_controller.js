@@ -1,5 +1,6 @@
 const InventoryItem = require('../model/inventory_model');
 const db = require('../config/db');
+const { logUserActivity } = require('../utils/activityLogger');
 
 const inventoryController = {
  createItem: async (req, res) => {
@@ -42,6 +43,12 @@ const inventoryController = {
       }
 
       // Send a success response with the newly created item
+      await logUserActivity(req, {
+        model_name: 'inventory_items',
+        action_type: 'CREATE',
+        record_id: newItem.id,
+        description: 'Created inventory item'
+      });
       res.status(201).json({ success: true, data: newItem });
 
     } catch (error) {
@@ -72,6 +79,12 @@ const inventoryController = {
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Item not found' });
       }
+      await logUserActivity(req, {
+        model_name: 'inventory_items',
+        action_type: 'UPDATE',
+        record_id: id,
+        description: 'Updated inventory item'
+      });
       res.status(200).json({ success: true, message: 'Item updated successfully' });
     } catch (error)      {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -89,6 +102,12 @@ const inventoryController = {
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Item not found' });
       }
+      await logUserActivity(req, {
+        model_name: 'inventory_items',
+        action_type: 'DELETE',
+        record_id: id,
+        description: 'Deleted inventory item'
+      });
       res.status(200).json({ success: true, message: 'Item deleted successfully' });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
