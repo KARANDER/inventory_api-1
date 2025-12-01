@@ -19,6 +19,7 @@ app.use(cors({
 }));
 
 const accountRoutes = require('./route/account_route');
+const accountHistoryRoutes = require('./route/account_history_route');
 const contactRoutes = require('./route/contact_route');
 const receiptRoutes = require('./route/receipt_route');
 const paymentRoutes = require('./route/payment_route');
@@ -39,6 +40,7 @@ const PORT = process.env.PORT || 3000;
 // MOVE ALL ROUTES BEFORE startServer()
 app.use('/user', userRoutes);
 app.use('/accounts', accountRoutes);
+app.use('/account-history', accountHistoryRoutes);
 app.use('/contacts', contactRoutes);
 app.use('/receipts', receiptRoutes);
 app.use('/payments', paymentRoutes);
