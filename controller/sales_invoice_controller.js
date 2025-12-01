@@ -26,26 +26,30 @@ const salesInvoiceController = {
       // 1. Existing sales invoice creation
       const newInvoice = await SalesInvoice.create(data);
 
-      // 2. After successful creation, update master_items stock quantity
+      // 2. After successful creation, update master_items stock quantity (PCS) and stock_kg (KG)
 
-      // Assuming invoice includes item_code and total_pcs in some form
+      // Assuming invoice includes item_code, total_pcs (PCS) and net_kg (KG)
       const item_code = data.item_code;
-      const total_pcs = data.total_pcs; // calculate total pcs
+      const total_pcs = data.total_pcs; // total pieces to subtract
+      const net_kg = parseFloat(data.net_kg) || 0; // total KG to subtract
 
-      // Fetch current stock_quantity from master_items for the item_code
+      // Fetch current stock quantities from master_items for the item_code
       const [masterRows] = await db.query(
-        'SELECT stock_quantity FROM master_items WHERE item_code = ? LIMIT 1',
+        'SELECT stock_quantity, COALESCE(stock_kg, 0) AS stock_kg FROM master_items WHERE item_code = ? LIMIT 1',
         [item_code]
       );
 
       if (masterRows.length > 0) {
-        const currentStock = masterRows[0].stock_quantity;
-        const updatedStock = currentStock - total_pcs;
+        const currentStockPcs = masterRows[0].stock_quantity;
+        const currentStockKg = masterRows[0].stock_kg || 0;
 
-        // Update stock_quantity in master_items
+        const updatedStockPcs = currentStockPcs - total_pcs;
+        const updatedStockKg = currentStockKg - net_kg;
+
+        // Update stock_quantity (PCS) and stock_kg (KG) in master_items
         await db.query(
-          'UPDATE master_items SET stock_quantity = ? WHERE item_code = ?',
-          [updatedStock, item_code]
+          'UPDATE master_items SET stock_quantity = ?, stock_kg = ? WHERE item_code = ?',
+          [updatedStockPcs, updatedStockKg, item_code]
         );
       }
 

@@ -21,16 +21,40 @@ const PurchaseInvoice = {
           await connection.query(itemQuery, itemData);
 
           // --- NEW STOCK UPDATE LOGIC ---
-          // 2. Check if there is a 'code' and a 'total_psc' to update master stock
-          if (item.code && item.total_psc && parseFloat(item.total_psc) > 0) {
+          // 2. Check if there is a 'code' and a 'total_psc' / 'net_kg' to update master stock
+          //    - stock_quantity  : managed in PCS  (item.total_psc)
+          //    - stock_kg        : managed in KG   (item.net_kg or item.total_kg)
+          const totalPcs = parseFloat(item.total_psc) || 0;
+          const totalKg =
+            parseFloat(item.net_kg || item.total_kg) || 0; // support either net_kg or total_kg
+
+          if (item.code && totalPcs > 0) {
             const stockUpdateQuery = `
               UPDATE master_items 
-              SET stock_quantity = stock_quantity + ? 
+              SET stock_quantity = stock_quantity + ?, 
+                  stock_kg       = COALESCE(stock_kg, 0) + ?
               WHERE item_code = ?
             `;
             // This query will only affect a row if a matching item_code is found.
             // If not found, it does nothing and the transaction continues.
-            await connection.query(stockUpdateQuery, [item.total_psc, item.code]);
+            await connection.query(stockUpdateQuery, [totalPcs, totalKg, item.code]);
+
+            // Insert stock history (CREDIT - stock in via purchase invoice)
+            const historyQuery = `
+              INSERT INTO stock_history
+              (item_code, transaction_type, invoice_type, invoice_number,
+               quantity_pcs, quantity_kg, movement_date, note, user_id)
+              VALUES (?, 'CREDIT', 'PURCHASE', ?, ?, ?, ?, ?, ?)
+            `;
+            await connection.query(historyQuery, [
+              item.code,
+              invoiceData.invoice_number || null,
+              totalPcs,
+              totalKg,
+              invoiceData.issue_date || new Date(),
+              null,
+              invoiceData.created_by || null
+            ]);
           }
           // --- END OF NEW LOGIC ---
         }
