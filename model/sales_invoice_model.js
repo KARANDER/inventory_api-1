@@ -71,6 +71,11 @@ const SalesInvoice = {
     return rows;
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM sales_invoice WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   update: async (id, data) => {
     const fields = [];
     const values = [];

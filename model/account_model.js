@@ -13,6 +13,11 @@ const Account = {
     return rows;
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM accounts WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   // --- NEW: Function to update an account ---
   update: async (id, accountData) => {
     const fields = Object.keys(accountData);

@@ -131,6 +131,11 @@ updateWithItems: async (invoiceId, invoiceData, lineItems = [], deletedItemIds =
     return rows;
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM purchase_invoices WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   findAllWithTotalAmount: async () => {
     const query = `
       SELECT

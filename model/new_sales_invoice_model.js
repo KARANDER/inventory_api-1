@@ -260,6 +260,11 @@ const Invoice = {
     }
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM invoices WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   findAll: async () => {
     // This function already uses SELECT *, so it will automatically include 'rate_kg'. No changes needed.
     const invoicesQuery = 'SELECT * FROM invoices ORDER BY id DESC';

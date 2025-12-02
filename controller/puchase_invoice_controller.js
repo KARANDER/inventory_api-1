@@ -1,4 +1,6 @@
 const PurchaseInvoice = require('../model/purchase_invoice_model');
+const { logUserActivity } = require('../utils/activityLogger');
+const { compareChanges } = require('../utils/compareChanges');
 
 // Helper function to process invoice items with new calculation logic
 const processInvoiceItems = (items = []) => {
@@ -43,6 +45,12 @@ const purchaseInvoiceController = {
         user_code,
         total_amount
       );
+      await logUserActivity(req, {
+        model_name: 'purchase_invoices',
+        action_type: 'CREATE',
+        record_id: newInvoice.id,
+        description: `Created purchase invoice ${invoiceData.invoice_number || ''}`
+      });
       res.status(201).json({ success: true, message: "Invoice created successfully.", data: newInvoice });
     } catch (error) {
       console.error('Error creating invoice:', error);
@@ -74,6 +82,12 @@ const purchaseInvoiceController = {
             return res.status(400).json({ success: false, message: 'Invoice ID is required for update.' });
         }
 
+        // Fetch old record before updating
+        const oldRecord = await PurchaseInvoice.findById(id);
+        if (!oldRecord) {
+            return res.status(404).json({ success: false, message: 'Purchase invoice not found' });
+        }
+
         // Process items to add calculated fields before sending to the model
         const processedItems = processInvoiceItems(line_items);
         
@@ -83,6 +97,16 @@ const purchaseInvoiceController = {
             processedItems,
             deleted_item_ids // Pass the new array to the model
         );
+        
+        // Compare old vs new values and log changes (excluding line_items)
+        const changes = compareChanges(oldRecord, invoiceData);
+        await logUserActivity(req, {
+          model_name: 'purchase_invoices',
+          action_type: 'UPDATE',
+          record_id: id,
+          description: 'Updated purchase invoice',
+          changes: changes
+        });
 
         res.status(200).json({ success: true, message: 'Invoice updated successfully', data: updatedInvoice });
     } catch (error) {
@@ -98,6 +122,12 @@ const purchaseInvoiceController = {
         return res.status(400).json({ success: false, message: 'Invoice ID is required.' });
       }
       await PurchaseInvoice.deleteInvoice(id);
+      await logUserActivity(req, {
+        model_name: 'purchase_invoices',
+        action_type: 'DELETE',
+        record_id: id,
+        description: 'Deleted purchase invoice'
+      });
       res.status(200).json({ success: true, message: 'Invoice deleted successfully' });
     } catch (error) {
       console.error('Error deleting invoice:', error);

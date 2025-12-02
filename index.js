@@ -35,6 +35,7 @@ const invoiceRoutes = require('./route/new_sales_invoice_route');
 const transportRoutes = require('./route/trasnport_route');
 const cartonInventoryRoutes = require('./route/carton_inventory_route');
 const patiRoutes = require('./route/pati_route');
+const userActivityRoutes = require('./route/user_activity_route');
 
 const PORT = process.env.PORT || 3000;
 
@@ -57,6 +58,7 @@ app.use('/invoicing', invoiceRoutes);
 app.use('/transport', transportRoutes);
 app.use('/carton', cartonInventoryRoutes);
 app.use('/pati', patiRoutes);
+app.use('/user-activity', userActivityRoutes);
 
 // An async function to connect to the DB and then start the server
 const startServer = async () => {

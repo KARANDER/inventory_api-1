@@ -1,5 +1,6 @@
 const Contact = require('../model/contact_model');
 const { logUserActivity } = require('../utils/activityLogger');
+const { compareChanges } = require('../utils/compareChanges');
 
 const contactController = {
   createContact: async (req, res) => {
@@ -46,6 +47,12 @@ const contactController = {
         return res.status(400).json({ success: false, message: 'Contact ID is required.' });
       }
 
+      // Fetch old record before updating
+      const oldRecord = await Contact.findById(id);
+      if (!oldRecord) {
+        return res.status(404).json({ success: false, message: 'Contact not found' });
+      }
+
       // Parse details JSON if present
       if (typeof req.body.details === 'string') {
         req.body.details = JSON.parse(req.body.details);
@@ -56,11 +63,17 @@ const contactController = {
 
       const updatedContact = await Contact.update(id, req.body);
 
+      // Compare old vs new values and log changes
+      // Note: For contacts, we compare the main fields (excluding nested details for simplicity)
+      const { details, updated_by, ...mainFields } = req.body;
+      const changes = compareChanges(oldRecord, mainFields);
+      
       await logUserActivity(req, {
         model_name: 'contacts',
         action_type: 'UPDATE',
         record_id: id,
-        description: 'Updated contact'
+        description: 'Updated contact',
+        changes: changes
       });
       res.status(200).json({ success: true, message: 'Contact updated successfully.', data: updatedContact });
     } catch (error) {

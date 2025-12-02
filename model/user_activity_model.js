@@ -2,13 +2,13 @@ const db = require('../config/db');
 
 const UserActivity = {
   // Generic logger used by controllers
-  log: async ({ user_id, user_name, model_name, action_type, record_id, description }) => {
+  log: async ({ user_id, user_name, model_name, action_type, record_id, description, changes }) => {
     if (!user_id || !user_name || !model_name || !action_type) return;
 
     const query = `
       INSERT INTO user_activity
-      (user_id, user_name, model_name, action_type, record_id, description)
-      VALUES (?, ?, ?, ?, ?, ?)
+      (user_id, user_name, model_name, action_type, record_id, description, changes)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -17,7 +17,8 @@ const UserActivity = {
       model_name,
       action_type,
       record_id || null,
-      description || null
+      description || null,
+      changes ? JSON.stringify(changes) : null
     ];
 
     await db.query(query, values);

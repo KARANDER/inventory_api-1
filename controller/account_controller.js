@@ -1,5 +1,6 @@
 const Account = require('../model/account_model');
 const { logUserActivity } = require('../utils/activityLogger');
+const { compareChanges } = require('../utils/compareChanges');
 
 const accountController = {
   createAccount: async (req, res) => {
@@ -35,15 +36,26 @@ const accountController = {
       if (!id) {
         return res.status(400).json({ success: false, message: 'Account ID is required in the body.' });
       }
+      
+      // Fetch old record before updating
+      const oldRecord = await Account.findById(id);
+      if (!oldRecord) {
+        return res.status(404).json({ success: false, message: 'Account not found' });
+      }
+      
       const affectedRows = await Account.update(id, accountData);
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Account not found' });
       }
+      
+      // Compare old vs new values and log changes
+      const changes = compareChanges(oldRecord, accountData);
       await logUserActivity(req, {
         model_name: 'accounts',
         action_type: 'UPDATE',
         record_id: id,
-        description: 'Updated account'
+        description: 'Updated account',
+        changes: changes
       });
       res.status(200).json({ success: true, message: 'Account updated successfully' });
     } catch (error) {

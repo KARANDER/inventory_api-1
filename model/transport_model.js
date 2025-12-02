@@ -13,6 +13,11 @@ const Transport = {
     return rows;
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM transport WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   update: async (id, name) => {
     const query = 'UPDATE transport SET name = ? WHERE id = ?';
     const [result] = await db.query(query, [name, id]);

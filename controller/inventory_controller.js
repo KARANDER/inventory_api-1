@@ -1,6 +1,7 @@
 const InventoryItem = require('../model/inventory_model');
 const db = require('../config/db');
 const { logUserActivity } = require('../utils/activityLogger');
+const { compareChanges } = require('../utils/compareChanges');
 
 const inventoryController = {
  createItem: async (req, res) => {
@@ -75,15 +76,26 @@ const inventoryController = {
       if (!id) {
         return res.status(400).json({ success: false, message: 'Item ID is required in the body.' });
       }
+      
+      // Fetch old record before updating
+      const oldRecord = await InventoryItem.findById(id);
+      if (!oldRecord) {
+        return res.status(404).json({ success: false, message: 'Item not found' });
+      }
+      
       const affectedRows = await InventoryItem.update(id, itemData);
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Item not found' });
       }
+      
+      // Compare old vs new values and log changes
+      const changes = compareChanges(oldRecord, itemData);
       await logUserActivity(req, {
         model_name: 'inventory_items',
         action_type: 'UPDATE',
         record_id: id,
-        description: 'Updated inventory item'
+        description: 'Updated inventory item',
+        changes: changes
       });
       res.status(200).json({ success: true, message: 'Item updated successfully' });
     } catch (error)      {

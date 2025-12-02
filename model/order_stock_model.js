@@ -13,6 +13,11 @@ const OrderStock = {
     return rows;
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM order_stock WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   update: async (id, order_stock) => {
     const query = 'UPDATE order_stock SET order_stock = ? WHERE id = ?';
     const [result] = await db.query(query, [order_stock, id]);
