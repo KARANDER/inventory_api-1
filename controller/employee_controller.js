@@ -132,6 +132,15 @@ const employeeController = {
         }
     },
 
+    getAllWorkRecords: async (req, res) => { // <-- NEW CONTROLLER METHOD
+        try {
+            const workRecords = await EmployeeModel.getAllWorkRecords();
+            res.status(200).json({ success: true, data: workRecords });
+        } catch (error) {
+            console.error('Error in getAllWorkRecords:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
+    },
 
     // --- CONSOLIDATED PAYROLL API ---
 

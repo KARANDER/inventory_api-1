@@ -49,5 +49,7 @@ router.post('/dailyTransaction', checkPermission(permission), employeeController
 // Get Weekly Salary Summary and finalize payment (Gross - Advance = Net)
 router.post('/getWeeklySalary', checkPermission(permission), employeeController.getWeeklySalary);
 
+router.post('/getAllWorkRecords', checkPermission(permission), employeeController.getAllWorkRecords);
+
 
 module.exports = router;

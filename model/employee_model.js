@@ -80,6 +80,15 @@ const EmployeeModel = {
   // --- WORK RECORDS (Daily Salary Tracking) METHODS ---
 
   /**
+   * Retrieves all work records.
+   * @returns {Array<object>} List of all employee work records.
+   */
+  getAllWorkRecords: async () => {
+    const [rows] = await db.query('SELECT * FROM employee_work_records');
+    return rows;
+  },
+
+  /**
    * Creates a new daily work record.
    * @param {object} recordData - Data for the work record, including daily_salary_paid.
    * @returns {object} The created record object.
