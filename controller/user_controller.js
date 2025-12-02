@@ -1,6 +1,7 @@
 const User = require('../model/user_model');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { logUserActivity } = require('../utils/activityLogger');
 
 const userController = {
   // --- MODIFIED register function ---
@@ -26,6 +27,16 @@ const userController = {
 
       // Pass permissions to the create function
       const newUser = await User.create({ user_name, email, password, permissions });
+
+      // Log user creation (if req.user exists, otherwise use created user's info)
+      if (req.user) {
+        await logUserActivity(req, {
+          model_name: 'users',
+          action_type: 'CREATE',
+          record_id: newUser.id,
+          description: `Created user ${user_name}`
+        });
+      }
 
       // No token is generated on creation anymore, as an admin is creating the user.
       res.status(201).json({
@@ -80,6 +91,15 @@ const userController = {
         payload,
         process.env.JWT_SECRET,
       );
+
+      // Log login activity (create a temporary req object for logging)
+      const tempReq = { user: { id: user.id, name: user.user_name } };
+      await logUserActivity(tempReq, {
+        model_name: 'users',
+        action_type: 'LOGIN',
+        record_id: user.id,
+        description: `User ${user.user_name} logged in`
+      });
 
       res.status(200).json({
         success: true,

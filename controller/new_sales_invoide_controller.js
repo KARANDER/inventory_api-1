@@ -1,4 +1,6 @@
 const Invoice = require('../model/new_sales_invoice_model');
+const { logUserActivity } = require('../utils/activityLogger');
+const { compareChanges } = require('../utils/compareChanges');
 
 const invoiceController = {
   createInvoice: async (req, res) => {
@@ -7,6 +9,12 @@ const invoiceController = {
       console.log('--- Full Request Body Received in Controller ---');
       console.log(JSON.stringify(req.body, null, 2));
       const newInvoice = await Invoice.create(req.body);
+      await logUserActivity(req, {
+        model_name: 'invoices',
+        action_type: 'CREATE',
+        record_id: newInvoice.id,
+        description: `Created invoice ${req.body.invoice_number || ''}`
+      });
       res.status(201).json({ success: true, message: 'Invoice created successfully', data: newInvoice });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -31,11 +39,28 @@ const invoiceController = {
         return res.status(400).json({ success: false, message: 'Invoice ID is required in the body.' });
       }
       
+      // Fetch old record before updating
+      const oldRecord = await Invoice.findById(id);
+      if (!oldRecord) {
+        return res.status(404).json({ success: false, message: 'Invoice not found' });
+      }
+      
       // Pass the entire request body to the model's update function.
       // The model is now smart enough to handle the complex data structure.
       const result = await Invoice.update(id, req.body);
 
       if (result.success) {
+        // Compare old vs new values (excluding items array for simplicity)
+        const { items, deleted_item_ids, ...mainData } = req.body;
+        const changes = compareChanges(oldRecord, mainData);
+        
+        await logUserActivity(req, {
+          model_name: 'invoices',
+          action_type: 'UPDATE',
+          record_id: id,
+          description: 'Updated invoice',
+          changes: changes
+        });
         res.status(200).json({ success: true, message: 'Invoice updated successfully' });
       } else {
         // This case might not be reached if errors are thrown, but it's good practice.
@@ -57,6 +82,12 @@ const invoiceController = {
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Invoice not found' });
       }
+      await logUserActivity(req, {
+        model_name: 'invoices',
+        action_type: 'DELETE',
+        record_id: id,
+        description: 'Deleted invoice'
+      });
       res.status(200).json({ success: true, message: 'Invoice deleted successfully' });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });

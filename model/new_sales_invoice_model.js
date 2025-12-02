@@ -127,20 +127,43 @@ const Invoice = {
         }
       }
 
-      // 5. Update master stock and sales orders (Unchanged)
+      // 5. Update master stock (PCS & KG) and sales orders, and record stock history
       for (const item of invoiceData.items) {
-       const { item_code, item_finish, total_pcs } = item;
+       const { item_code, item_finish, total_pcs, net_kg } = item;
     
-    if (!item_code || total_pcs == null) {
-      throw new Error('Item with missing item_code or total_pcs found.');
-    }
+        if (!item_code || total_pcs == null) {
+          throw new Error('Item with missing item_code or total_pcs found.');
+        }
 
-    // REMOVED: Stock validation check entirely
-    // This allows negative stock (overselling/backorder)
-    
-    // Direct stock update - now allows negative values
-    const updateStockQuery = 'UPDATE master_items SET stock_quantity = stock_quantity - ? WHERE item_code = ?';
-    await connection.query(updateStockQuery, [total_pcs, item_code]);
+        // REMOVED: Stock validation check entirely
+        // This allows negative stock (overselling/backorder)
+        
+        const totalKg = parseFloat(net_kg) || 0;
+
+        // Direct stock update - now allows negative values
+        const updateStockQuery = `
+          UPDATE master_items 
+          SET stock_quantity = stock_quantity - ?, 
+              stock_kg       = COALESCE(stock_kg, 0) - ?
+          WHERE item_code = ?
+        `;
+        await connection.query(updateStockQuery, [total_pcs, totalKg, item_code]);
+        // Insert stock history (DEBIT - stock out via sales invoice)
+        const historyQuery = `
+          INSERT INTO stock_history
+          (item_code, transaction_type, invoice_type, invoice_number,
+           quantity_pcs, quantity_kg, movement_date, note, user_id)
+          VALUES (?, 'DEBIT', 'SALES', ?, ?, ?, ?, ?, ?)
+        `;
+        await connection.query(historyQuery, [
+          item_code,
+          invoiceData.invoice_number || null,
+          total_pcs,
+          totalKg,
+          invoiceData.invoice_date || new Date(),
+          null,
+          invoiceData.created_by || null
+        ]);
         let total_pcs_to_invoice = total_pcs;
         if (item_code && item_finish && total_pcs_to_invoice > 0) {
           const [salesOrders] = await connection.query(`
@@ -235,6 +258,11 @@ const Invoice = {
     } finally {
       connection.release();
     }
+  },
+
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM invoices WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
   },
 
   findAll: async () => {

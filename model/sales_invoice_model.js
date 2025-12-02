@@ -71,6 +71,11 @@ const SalesInvoice = {
     return rows;
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM sales_invoice WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   update: async (id, data) => {
     const fields = [];
     const values = [];
@@ -224,8 +229,14 @@ findByInvoiceNo: async (invoiceNo) => {
         
         // 3. UPDATE master_items
         if (item_code && total_pcs > 0) {
-            const updateStockQuery = 'UPDATE master_items SET stock_quantity = GREATEST(stock_quantity - ?, 0) WHERE item_code = ?';
-            await connection.query(updateStockQuery, [total_pcs, item_code]);
+            const totalKg = parseFloat(net_kg) || 0;
+            const updateStockQuery = `
+              UPDATE master_items 
+              SET stock_quantity = GREATEST(stock_quantity - ?, 0),
+                  stock_kg       = GREATEST(COALESCE(stock_kg, 0) - ?, 0)
+              WHERE item_code = ?
+            `;
+            await connection.query(updateStockQuery, [total_pcs, totalKg, item_code]);
         }
 
         createdInvoices.push({ id: result.insertId, ...invoiceData });

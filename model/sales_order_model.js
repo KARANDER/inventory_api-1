@@ -28,6 +28,17 @@ const SalesOrder = {
     return rows;
   },
 
+  findById: async (id) => {
+    const query = `
+      SELECT so.*, c.contact_name as customer_name 
+      FROM sales_orders so
+      LEFT JOIN contacts c ON so.customer_id = c.id
+      WHERE so.id = ?
+    `;
+    const [rows] = await db.query(query, [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   update: async (id, orderData) => {
     const fields = Object.keys(orderData);
     const setClause = fields.map(field => `${field} = ?`).join(', ');

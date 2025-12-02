@@ -1,5 +1,7 @@
 const SalesOrder = require('../model/sales_order_model');
 const db = require('../config/db');
+const { logUserActivity } = require('../utils/activityLogger');
+const { compareChanges } = require('../utils/compareChanges');
 
 const salesOrderController = {
   createOrder: async (req, res) => {
@@ -16,6 +18,12 @@ const salesOrderController = {
         created_by
       };
       const newOrder = await SalesOrder.create(orderData);
+      await logUserActivity(req, {
+        model_name: 'sales_orders',
+        action_type: 'CREATE',
+        record_id: newOrder.id,
+        description: 'Created sales order'
+      });
       res.status(201).json({ success: true, data: newOrder });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -37,6 +45,13 @@ const salesOrderController = {
       if (!id) {
         return res.status(400).json({ success: false, message: 'Order ID is required in the body.' });
       }
+      
+      // Fetch old record before updating
+      const oldRecord = await SalesOrder.findById(id);
+      if (!oldRecord) {
+        return res.status(404).json({ success: false, message: 'Sales order not found' });
+      }
+      
       // Map incoming fields to match model expectations
       const mappedData = {
         ...orderData,
@@ -47,6 +62,16 @@ const salesOrderController = {
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Sales order not found' });
       }
+      
+      // Compare old vs new values and log changes
+      const changes = compareChanges(oldRecord, mappedData);
+      await logUserActivity(req, {
+        model_name: 'sales_orders',
+        action_type: 'UPDATE',
+        record_id: id,
+        description: 'Updated sales order',
+        changes: changes
+      });
       res.status(200).json({ success: true, message: 'Sales order updated successfully' });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -63,6 +88,12 @@ const salesOrderController = {
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Sales order not found' });
       }
+      await logUserActivity(req, {
+        model_name: 'sales_orders',
+        action_type: 'DELETE',
+        record_id: id,
+        description: 'Deleted sales order'
+      });
       res.status(200).json({ success: true, message: 'Sales order deleted successfully' });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -93,11 +124,27 @@ const salesOrderController = {
           rate_kz: fieldsToUpdate.rate_kz
         };
         try {
+          // Fetch old record before updating
+          const oldRecord = await SalesOrder.findById(id);
+          if (!oldRecord) {
+            failed.push({ id, message: "Sales order not found" });
+            continue;
+          }
+          
           const affected = await SalesOrder.update(id, mappedData);
           if (affected === 0) {
             failed.push({ id, message: "Sales order not found" });
           } else {
             success.push({ id });
+            // Compare old vs new values and log changes
+            const changes = compareChanges(oldRecord, mappedData);
+            await logUserActivity(req, {
+              model_name: 'sales_orders',
+              action_type: 'UPDATE',
+              record_id: id,
+              description: 'Updated sales order (batch)',
+              changes: changes
+            });
           }
         } catch (error) {
           failed.push({ id, message: error.message });
@@ -123,7 +170,15 @@ const salesOrderController = {
       for (const id of ids) {
         try {
           const affected = await SalesOrder.delete(id);
-          if (affected > 0) deletedCount++;
+          if (affected > 0) {
+            deletedCount++;
+            await logUserActivity(req, {
+              model_name: 'sales_orders',
+              action_type: 'DELETE',
+              record_id: id,
+              description: 'Deleted sales order (batch)'
+            });
+          }
         } catch {
           // ignore individual failures or collect for reporting
         }

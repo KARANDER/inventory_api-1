@@ -13,6 +13,11 @@ const Finishes = {
     return rows;
   },
 
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM finishes_table WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
   update: async (id, finish) => {
     const query = 'UPDATE finishes_table SET finish = ? WHERE id = ?';
     const [result] = await db.query(query, [finish, id]);

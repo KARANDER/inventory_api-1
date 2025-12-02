@@ -1,5 +1,7 @@
 const SalesInvoice = require('../model/sales_invoice_model');
 const db = require('../config/db');
+const { logUserActivity } = require('../utils/activityLogger');
+const { compareChanges } = require('../utils/compareChanges');
 
 const salesInvoiceController = {
   createInvoice: async (req, res) => {
@@ -25,27 +27,37 @@ const salesInvoiceController = {
 
       // 1. Existing sales invoice creation
       const newInvoice = await SalesInvoice.create(data);
+      await logUserActivity(req, {
+        model_name: 'sales_invoices',
+        action_type: 'CREATE',
+        record_id: newInvoice.id,
+        description: `Created sales invoice ${data.invoice_no || ''}`
+      });
 
-      // 2. After successful creation, update master_items stock quantity
+      // 2. After successful creation, update master_items stock quantity (PCS) and stock_kg (KG)
 
-      // Assuming invoice includes item_code and total_pcs in some form
+      // Assuming invoice includes item_code, total_pcs (PCS) and net_kg (KG)
       const item_code = data.item_code;
-      const total_pcs = data.total_pcs; // calculate total pcs
+      const total_pcs = data.total_pcs; // total pieces to subtract
+      const net_kg = parseFloat(data.net_kg) || 0; // total KG to subtract
 
-      // Fetch current stock_quantity from master_items for the item_code
+      // Fetch current stock quantities from master_items for the item_code
       const [masterRows] = await db.query(
-        'SELECT stock_quantity FROM master_items WHERE item_code = ? LIMIT 1',
+        'SELECT stock_quantity, COALESCE(stock_kg, 0) AS stock_kg FROM master_items WHERE item_code = ? LIMIT 1',
         [item_code]
       );
 
       if (masterRows.length > 0) {
-        const currentStock = masterRows[0].stock_quantity;
-        const updatedStock = currentStock - total_pcs;
+        const currentStockPcs = masterRows[0].stock_quantity;
+        const currentStockKg = masterRows[0].stock_kg || 0;
 
-        // Update stock_quantity in master_items
+        const updatedStockPcs = currentStockPcs - total_pcs;
+        const updatedStockKg = currentStockKg - net_kg;
+
+        // Update stock_quantity (PCS) and stock_kg (KG) in master_items
         await db.query(
-          'UPDATE master_items SET stock_quantity = ? WHERE item_code = ?',
-          [updatedStock, item_code]
+          'UPDATE master_items SET stock_quantity = ?, stock_kg = ? WHERE item_code = ?',
+          [updatedStockPcs, updatedStockKg, item_code]
         );
       }
 
@@ -105,7 +117,26 @@ const salesInvoiceController = {
         });
       }
 
+      // Fetch old record before updating
+      const oldRecord = await SalesInvoice.findById(id);
+      if (!oldRecord) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Sales invoice not found' 
+        });
+      }
+
       const updated = await SalesInvoice.update(id, updateData);
+      
+      // Compare old vs new values and log changes
+      const changes = compareChanges(oldRecord, updateData);
+      await logUserActivity(req, {
+        model_name: 'sales_invoices',
+        action_type: 'UPDATE',
+        record_id: id,
+        description: 'Updated sales invoice',
+        changes: changes
+      });
 
       res.status(200).json({ 
         success: true, 
@@ -135,6 +166,12 @@ const salesInvoiceController = {
       }
 
       await SalesInvoice.delete(id);
+      await logUserActivity(req, {
+        model_name: 'sales_invoices',
+        action_type: 'DELETE',
+        record_id: id,
+        description: 'Deleted sales invoice'
+      });
 
       res.status(200).json({ 
         success: true, 
@@ -275,6 +312,16 @@ findInvoiceByNumber: async (req, res) => {
       // LOG 2
       console.log(`--- CONTROLLER: Calling model to create ${invoices.length} invoices. ---`);
       const newInvoices = await SalesInvoice.createBatch(invoices);
+
+      // Log batch creation
+      for (const invoice of newInvoices) {
+        await logUserActivity(req, {
+          model_name: 'sales_invoices',
+          action_type: 'CREATE',
+          record_id: invoice.id,
+          description: `Created sales invoice ${invoice.invoice_no || ''} (batch)`
+        });
+      }
 
       return res.status(201).json({
         success: true,

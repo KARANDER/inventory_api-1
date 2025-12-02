@@ -1,4 +1,5 @@
 const CartonInventory = require('../model/carton_inventory_model');
+const { logUserActivity } = require('../utils/activityLogger');
 
 const cartonInventoryController = {
   /**
@@ -15,6 +16,12 @@ const cartonInventoryController = {
       }
 
       const newCarton = await CartonInventory.create({ carton_name, carton_quantity, created_by });
+      await logUserActivity(req, {
+        model_name: 'carton_inventory',
+        action_type: 'CREATE',
+        record_id: newCarton.id,
+        description: `Created carton ${carton_name}`
+      });
       res.status(201).json({ success: true, message: 'Carton added successfully!', data: newCarton });
 
     } catch (error) {
