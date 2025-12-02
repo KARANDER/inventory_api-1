@@ -36,6 +36,7 @@ const transportRoutes = require('./route/trasnport_route');
 const cartonInventoryRoutes = require('./route/carton_inventory_route');
 const patiRoutes = require('./route/pati_route');
 const userActivityRoutes = require('./route/user_activity_route');
+const employeeRoutes = require('./route/employee_route');
 
 const PORT = process.env.PORT || 3000;
 
@@ -59,6 +60,7 @@ app.use('/transport', transportRoutes);
 app.use('/carton', cartonInventoryRoutes);
 app.use('/pati', patiRoutes);
 app.use('/user-activity', userActivityRoutes);
+app.use('/employees', employeeRoutes);
 
 // An async function to connect to the DB and then start the server
 const startServer = async () => {

@@ -1,0 +1,163 @@
+// model/employee_model.js
+
+const db = require('../config/db'); // Assuming the database connection is available here
+
+const EmployeeModel = {
+  
+  // --- EMPLOYEE (Master Data) METHODS ---
+
+  /**
+   * Creates a new employee record.
+   * @param {object} employeeData - Data for the new employee.
+   * @returns {object} The created employee object.
+   */
+  createEmployee: async (employeeData) => {
+    const columns = Object.keys(employeeData);
+    const values = Object.values(employeeData);
+    const placeholders = columns.map(() => '?').join(', ');
+    const query = `INSERT INTO employees (${columns.join(', ')}) VALUES (${placeholders})`;
+    const [result] = await db.query(query, values);
+    return { id: result.insertId, ...employeeData };
+  },
+
+  /**
+   * Retrieves an employee by ID.
+   * @param {number} id - Employee ID.
+   * @returns {object|null} The employee record.
+   */
+  getEmployeeById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM employees WHERE id = ?', [id]);
+    return rows[0];
+  },
+
+  /**
+   * Retrieves an employee's daily salary by ID (Crucial for calculation).
+   * @param {number} id - Employee ID.
+   * @returns {number|null} The daily_salary amount.
+   */
+  getEmployeeDailySalary: async (id) => {
+    // Only select the daily_salary field
+    const [rows] = await db.query('SELECT daily_salary FROM employees WHERE id = ?', [id]);
+    // Return the salary as a float, or null if not found
+    return rows.length > 0 ? parseFloat(rows[0].daily_salary) : null;
+  },
+
+  /**
+   * Retrieves all active employees.
+   * @returns {Array<object>} List of employees.
+   */
+  getAllEmployees: async () => {
+    // Note: Assuming 'is_active = 1' is used for active employees
+    const [rows] = await db.query('SELECT * FROM employees');
+    return rows;
+  },
+  
+  /**
+   * Updates an existing employee record.
+   * @param {number} id - Employee ID.
+   * @param {object} updateData - Data to update.
+   * @returns {number} Number of affected rows (0 or 1).
+   */
+  updateEmployee: async (id, updateData) => {
+    const updates = Object.keys(updateData).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(updateData), id];
+    const query = `UPDATE employees SET ${updates} WHERE id = ?`;
+    const [result] = await db.query(query, values);
+    return result.affectedRows;
+  },
+
+  /**
+   * Deactivates (soft delete) an employee record.
+   * @param {number} id - Employee ID.
+   * @returns {number} Number of affected rows (0 or 1).
+   */
+  deleteEmployee: async (id) => {
+    const [result] = await db.query('DELETE FROM employees WHERE id = ?', [id]);
+    return result.affectedRows;
+  },
+
+
+  // --- WORK RECORDS (Daily Salary Tracking) METHODS ---
+
+  /**
+   * Creates a new daily work record.
+   * @param {object} recordData - Data for the work record, including daily_salary_paid.
+   * @returns {object} The created record object.
+   */
+  createWorkRecord: async (recordData) => {
+    const columns = Object.keys(recordData);
+    const values = Object.values(recordData);
+    const placeholders = columns.map(() => '?').join(', ');
+    const query = `INSERT INTO employee_work_records (${columns.join(', ')}) VALUES (${placeholders})`;
+    const [result] = await db.query(query, values);
+    return { id: result.insertId, ...recordData };
+  },
+
+  /**
+   * Retrieves the total gross salary earned by an employee over a specific date range.
+   * @param {number} employeeId - ID of the employee.
+   * @param {string} startDate - Start date of the period (YYYY-MM-DD).
+   * @param {string} endDate - End date of the period (YYYY-MM-DD).
+   * @returns {number} The total sum of daily_salary_paid.
+   */
+  getGrossWeeklySalary: async (employeeId, startDate, endDate) => {
+    const query = `
+      SELECT SUM(daily_salary_paid) AS gross_salary
+      FROM employee_work_records
+      WHERE employee_id = ? AND work_date BETWEEN ? AND ?
+    `;
+    const [rows] = await db.query(query, [employeeId, startDate, endDate]);
+    // Return 0 if no records are found
+    return rows.length > 0 && rows[0].gross_salary !== null ? parseFloat(rows[0].gross_salary) : 0;
+  },
+
+
+  // --- ADVANCES (Deduction Tracking) METHODS ---
+
+  /**
+   * Creates a new salary advance record.
+   * @param {object} advanceData - Data for the advance record.
+   * @returns {object} The created advance object.
+   */
+  createAdvance: async (advanceData) => {
+    const columns = Object.keys(advanceData);
+    const values = Object.values(advanceData);
+    const placeholders = columns.map(() => '?').join(', ');
+    const query = `INSERT INTO employee_advances (${columns.join(', ')}) VALUES (${placeholders})`;
+    const [result] = await db.query(query, values);
+    return { id: result.insertId, ...advanceData };
+  },
+
+  /**
+   * Retrieves the total amount of undeducted advances for an employee.
+   * @param {number} employeeId - ID of the employee.
+   * @returns {number} The total sum of undeducted advances.
+   */
+  getTotalUndeductedAdvances: async (employeeId) => {
+    const query = `
+      SELECT SUM(amount) AS total_advance
+      FROM employee_advances
+      WHERE employee_id = ? AND deducted = 0
+    `;
+    const [rows] = await db.query(query, [employeeId]);
+    return rows.length > 0 && rows[0].total_advance !== null ? parseFloat(rows[0].total_advance) : 0;
+  },
+
+  /**
+   * Marks all pending advances for an employee as deducted.
+   * This should be called after a successful salary payment.
+   * @param {number} employeeId - ID of the employee.
+   * @returns {number} Number of affected rows.
+   */
+  markAdvancesAsDeducted: async (employeeId) => {
+    const query = `
+      UPDATE employee_advances
+      SET deducted = 1
+      WHERE employee_id = ? AND deducted = 0
+    `;
+    const [result] = await db.query(query, [employeeId]);
+    return result.affectedRows;
+  }
+};
+
+module.exports = EmployeeModel;
