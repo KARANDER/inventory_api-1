@@ -3,7 +3,7 @@
 const EmployeeModel = require('../model/employee_model');
 const { calculateDailyPay } = require('../utils/hourlyRateCalculator');
 const { logUserActivity } = require('../utils/activityLogger');
-const { compareChanges } = require('../utils/compareChanges'); 
+const { compareChanges } = require('../utils/compareChanges');
 
 const employeeController = {
 
@@ -12,7 +12,7 @@ const employeeController = {
     createEmployee: async (req, res) => {
         try {
             const createdBy = req.user.id;
-            const employeeData = { ...req.body,  };
+            const employeeData = { ...req.body, };
             const profileFile = req.files && req.files['profile_photo'] ? req.files['profile_photo'][0] : null;
             const documentFiles = req.files && req.files['document_photos'] ? req.files['document_photos'] : [];
 
@@ -22,29 +22,15 @@ const employeeController = {
             // Overwrite photo fields with the stored paths (assuming /uploads/ is the root)
             if (profileFile) {
                 // Example path: /uploads/profile_photo-1701100000.jpg
-                employeeData.profile_photo = profileFile.path; 
+                employeeData.profile_photo = profileFile.path;
             }
             if (documentFiles.length > 0) {
-    // If files were uploaded via Multer, map the file paths and stringify them.
-    // Multer gives us clean paths (e.g., 'uploads/doc.pdf').
-    employeeData.document_photos = JSON.stringify(documentFiles.map(f => f.path));
-} else if (req.body.document_photos) {
-    // If no files were uploaded, but a JSON string of paths was passed in the form-data.
-    // The incoming value is already a string, e.g., '["/path/to/doc1.pdf"]'.
-    // We attempt to parse it and stringify it back to ensure it's clean and valid JSON.
-    try {
-        // Step 1: Parse the string received from form-data (which might be over-escaped)
-        const parsedPaths = JSON.parse(req.body.document_photos);
-        
-        // Step 2: Stringify the array back. This creates a clean, correctly-escaped JSON string for MySQL.
-        employeeData.document_photos = JSON.stringify(parsedPaths);
-        
-    } catch (e) {
-        console.warn("Could not parse document_photos string from body. Passing raw string. Error:", e.message);
-        // Fallback: If parsing fails, try to pass the raw string, but this is less safe.
-        employeeData.document_photos = req.body.document_photos; 
-    }
-}
+            // Store array of file paths as JSON string
+            employeeData.document_photos = JSON.stringify(documentFiles.map(f => f.path));
+        } else {
+            // If no files uploaded, set to NULL or empty array
+            employeeData.document_photos = null; // or JSON.stringify([])
+        }
 
             if (!employeeData.name || !employeeData.mobile || !employeeData.daily_salary) {
                 return res.status(400).json({ success: false, message: 'Name, mobile, and daily_salary are required.' });
@@ -89,7 +75,7 @@ const employeeController = {
             }
 
             const affectedRows = await EmployeeModel.updateEmployee(id, updateData);
-            
+
             const changes = compareChanges(oldRecord, updateData);
             await logUserActivity(req, {
                 model_name: 'employees',
@@ -159,7 +145,7 @@ const employeeController = {
             if (dailySalary === null) {
                 return res.status(404).json({ success: false, message: 'Employee not found.' });
             }
-            
+
             const daily_salary_paid = calculateDailyPay(dailySalary, working_hours, overtime_hours);
 
             const workRecordData = {
@@ -171,13 +157,13 @@ const employeeController = {
             };
 
             const newWorkRecord = await EmployeeModel.createWorkRecord(workRecordData);
-            
-            transactionSummary.daily_record = { 
-                id: newWorkRecord.id, 
+
+            transactionSummary.daily_record = {
+                id: newWorkRecord.id,
                 daily_pay: daily_salary_paid,
-                status: 'Created' 
+                status: 'Created'
             };
-            
+
             // --- 2. PROCESS ADVANCE (IF APPLICABLE) ---
             if (parseFloat(advance_amount) > 0) {
                 const advanceData = {
@@ -195,7 +181,7 @@ const employeeController = {
                     status: 'Created'
                 };
             } else {
-                 transactionSummary.advance = { status: 'Skipped', message: 'No advance amount provided.' };
+                transactionSummary.advance = { status: 'Skipped', message: 'No advance amount provided.' };
             }
 
             await logUserActivity(req, {
@@ -206,8 +192,8 @@ const employeeController = {
             });
 
 
-            res.status(201).json({ 
-                success: true, 
+            res.status(201).json({
+                success: true,
                 message: 'Daily transaction processed successfully.',
                 summary: transactionSummary
             });
@@ -215,7 +201,7 @@ const employeeController = {
         } catch (error) {
             // Handle duplicate entry for daily record
             if (error.code === 'ER_DUP_ENTRY') {
-                 return res.status(409).json({ success: false, message: 'A work record already exists for this employee on this date. Use an update API instead.', error: error.message });
+                return res.status(409).json({ success: false, message: 'A work record already exists for this employee on this date. Use an update API instead.', error: error.message });
             }
             console.error('Error in dailyTransaction:', error);
             res.status(500).json({ success: false, message: 'Server Error', error: error.message });
@@ -224,7 +210,7 @@ const employeeController = {
 
     getWeeklySalary: async (req, res) => {
         const { employee_id, startDate, endDate } = req.body;
-        
+
         if (!employee_id || !startDate || !endDate) {
             return res.status(400).json({ success: false, message: 'employee_id, startDate, and endDate are required.' });
         }
@@ -232,20 +218,20 @@ const employeeController = {
         try {
             // 1. Calculate Gross Weekly Earning
             const grossSalary = await EmployeeModel.getGrossWeeklySalary(employee_id, startDate, endDate);
-            
+
             // 2. Get Total Undeducted Advances
             const advancesToDeduct = await EmployeeModel.getTotalUndeductedAdvances(employee_id);
 
             // 3. Calculate Net Payout
             let netPayout = grossSalary - advancesToDeduct;
-            netPayout = parseFloat(netPayout.toFixed(2)); 
+            netPayout = parseFloat(netPayout.toFixed(2));
 
             // 4. Mark advances as deducted (Crucial final step)
             let advancesMarked = 0;
             if (advancesToDeduct > 0 && netPayout >= 0) { // Only mark if there's a positive or zero net payout 
                 advancesMarked = await EmployeeModel.markAdvancesAsDeducted(employee_id);
             }
-            
+
             await logUserActivity(req, {
                 model_name: 'payroll_report',
                 action_type: 'REPORT',
