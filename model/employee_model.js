@@ -120,6 +120,29 @@ const EmployeeModel = {
     return rows.length > 0 && rows[0].gross_salary !== null ? parseFloat(rows[0].gross_salary) : 0;
   },
 
+  /**
+   * Retrieves daily work records for an employee over a specific date range.
+   * @param {number} employeeId - ID of the employee.
+   * @param {string} startDate - Start date of the period (YYYY-MM-DD).
+   * @param {string} endDate - End date of the period (YYYY-MM-DD).
+   * @returns {Array<object>} List of daily work records ordered by date.
+   */
+  getDailyWorkRecords: async (employeeId, startDate, endDate) => {
+    const query = `
+      SELECT 
+        id,
+        work_date,
+        working_hours,
+        overtime_hours,
+        daily_salary_paid
+      FROM employee_work_records
+      WHERE employee_id = ? AND work_date BETWEEN ? AND ?
+      ORDER BY work_date ASC
+    `;
+    const [rows] = await db.query(query, [employeeId, startDate, endDate]);
+    return rows;
+  },
+
 
   // --- ADVANCES (Deduction Tracking) METHODS ---
 

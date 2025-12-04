@@ -132,12 +132,28 @@ const employeeController = {
 
     dailyTransaction: async (req, res) => {
         try {
-            const { employee_id, work_date, working_hours, overtime_hours = 0, advance_amount = 0, advance_date = work_date } = req.body;
+            const { employee_id, work_date, days, overtime_hours = 0, advance_amount = 0, advance_date = work_date } = req.body;
             const createdBy = req.user.id;
             let transactionSummary = {};
 
-            if (!employee_id || !work_date || working_hours === undefined) {
-                return res.status(400).json({ success: false, message: 'employee_id, work_date, and working_hours are required.' });
+            // Validation: days is required, overtime_hours can be negative (early leave) or positive (overtime)
+            if (!employee_id || !work_date || days === undefined) {
+                return res.status(400).json({ success: false, message: 'employee_id, work_date, and days are required.' });
+            }
+
+            // Convert days to hours: 1 day = 10 hours
+            // Calculate total working hours: (days * 10) + overtime_hours
+            // overtime_hours can be negative (e.g., -1 means 1 hour early = 9 hours total)
+            const daysAsFloat = parseFloat(days);
+            const overtimeAsFloat = parseFloat(overtime_hours);
+            const totalWorkingHours = (daysAsFloat * 10) + overtimeAsFloat;
+
+            // Validate that total hours is not negative
+            if (totalWorkingHours < 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: `Invalid hours calculation: ${days} day(s) + ${overtime_hours} overtime = ${totalWorkingHours} hours. Total hours cannot be negative.` 
+                });
             }
 
             // --- 1. PROCESS DAILY RECORD ---
@@ -146,13 +162,15 @@ const employeeController = {
                 return res.status(404).json({ success: false, message: 'Employee not found.' });
             }
 
-            const daily_salary_paid = calculateDailyPay(dailySalary, working_hours, overtime_hours);
+            // Calculate daily salary based on total working hours
+            // For calculation: working_hours = days * 10, overtime_hours = the modifier
+            const daily_salary_paid = calculateDailyPay(dailySalary, daysAsFloat * 10, overtimeAsFloat);
 
             const workRecordData = {
                 employee_id,
                 work_date,
-                working_hours: parseFloat(working_hours),
-                overtime_hours: parseFloat(overtime_hours),
+                working_hours: totalWorkingHours, // Store total calculated hours
+                overtime_hours: overtimeAsFloat, // Store overtime modifier (can be negative)
                 daily_salary_paid,
             };
 
@@ -188,7 +206,7 @@ const employeeController = {
                 model_name: 'daily_transaction',
                 action_type: 'CREATE',
                 record_id: employee_id,
-                description: `Processed daily work and potential advance for employee ${employee_id} on ${work_date}`
+                description: `Processed daily work (${days} day(s), ${overtime_hours} overtime hours = ${totalWorkingHours} total hours) and potential advance for employee ${employee_id} on ${work_date}`
             });
 
 
@@ -208,6 +226,154 @@ const employeeController = {
         }
     },
 
+    batchDailyTransaction: async (req, res) => {
+        try {
+            const { transactions } = req.body; // Array of daily transactions
+
+            if (!transactions || !Array.isArray(transactions) || transactions.length === 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'transactions array is required and must contain at least one transaction.' 
+                });
+            }
+
+            const results = [];
+            const errors = [];
+            let successCount = 0;
+            let failCount = 0;
+
+            // Process each transaction
+            for (let i = 0; i < transactions.length; i++) {
+                const transaction = transactions[i];
+                const { employee_id, work_date, days, overtime_hours = 0, advance_amount = 0, advance_date = work_date } = transaction;
+
+                try {
+                    // Validate required fields
+                    if (!employee_id || !work_date || days === undefined) {
+                        errors.push({
+                            index: i,
+                            transaction: transaction,
+                            error: 'employee_id, work_date, and days are required.'
+                        });
+                        failCount++;
+                        continue;
+                    }
+
+                    // Convert days to hours: 1 day = 10 hours
+                    const daysAsFloat = parseFloat(days);
+                    const overtimeAsFloat = parseFloat(overtime_hours);
+                    const totalWorkingHours = (daysAsFloat * 10) + overtimeAsFloat;
+
+                    // Validate that total hours is not negative
+                    if (totalWorkingHours < 0) {
+                        errors.push({
+                            index: i,
+                            transaction: transaction,
+                            error: `Invalid hours calculation: ${days} day(s) + ${overtime_hours} overtime = ${totalWorkingHours} hours. Total hours cannot be negative.`
+                        });
+                        failCount++;
+                        continue;
+                    }
+
+                    // Get employee daily salary
+                    const dailySalary = await EmployeeModel.getEmployeeDailySalary(employee_id);
+                    if (dailySalary === null) {
+                        errors.push({
+                            index: i,
+                            transaction: transaction,
+                            error: 'Employee not found.'
+                        });
+                        failCount++;
+                        continue;
+                    }
+
+                    // Calculate daily salary paid
+                    const daily_salary_paid = calculateDailyPay(dailySalary, daysAsFloat * 10, overtimeAsFloat);
+
+                    const workRecordData = {
+                        employee_id,
+                        work_date,
+                        working_hours: totalWorkingHours,
+                        overtime_hours: overtimeAsFloat,
+                        daily_salary_paid,
+                    };
+
+                    // Create work record
+                    const newWorkRecord = await EmployeeModel.createWorkRecord(workRecordData);
+
+                    // Process advance if applicable
+                    let advanceRecord = null;
+                    if (parseFloat(advance_amount) > 0) {
+                        const advanceData = {
+                            employee_id,
+                            advance_date: advance_date,
+                            amount: parseFloat(advance_amount),
+                            deducted: 0
+                        };
+                        advanceRecord = await EmployeeModel.createAdvance(advanceData);
+                    }
+
+                    results.push({
+                        index: i,
+                        work_date: work_date,
+                        employee_id: employee_id,
+                        work_record_id: newWorkRecord.id,
+                        daily_pay: daily_salary_paid,
+                        advance_id: advanceRecord ? advanceRecord.id : null,
+                        status: 'Success'
+                    });
+                    successCount++;
+
+                } catch (error) {
+                    // Handle duplicate entry
+                    if (error.code === 'ER_DUP_ENTRY') {
+                        errors.push({
+                            index: i,
+                            transaction: transaction,
+                            error: `A work record already exists for employee ${employee_id} on ${work_date}.`
+                        });
+                    } else {
+                        errors.push({
+                            index: i,
+                            transaction: transaction,
+                            error: error.message || 'Unknown error occurred.'
+                        });
+                    }
+                    failCount++;
+                }
+            }
+
+            // Log activity for batch operation
+            await logUserActivity(req, {
+                model_name: 'daily_transaction',
+                action_type: 'BATCH_CREATE',
+                record_id: null,
+                description: `Batch processed ${transactions.length} daily transactions: ${successCount} succeeded, ${failCount} failed.`
+            });
+
+            // Return results
+            const response = {
+                success: failCount === 0, // Only true if all succeeded
+                message: `Processed ${transactions.length} transactions: ${successCount} succeeded, ${failCount} failed.`,
+                summary: {
+                    total: transactions.length,
+                    succeeded: successCount,
+                    failed: failCount
+                },
+                results: results,
+                errors: errors.length > 0 ? errors : undefined
+            };
+
+            // Return appropriate status code
+            const statusCode = failCount === 0 ? 201 : (successCount > 0 ? 207 : 400); // 207 = Multi-Status
+            res.status(statusCode).json(response);
+
+        } catch (error) {
+            console.error('Error in batchDailyTransaction:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
+    },
+
     getWeeklySalary: async (req, res) => {
         const { employee_id, startDate, endDate } = req.body;
 
@@ -216,19 +382,93 @@ const employeeController = {
         }
 
         try {
-            // 1. Calculate Gross Weekly Earning
-            const grossSalary = await EmployeeModel.getGrossWeeklySalary(employee_id, startDate, endDate);
+            // Get employee details to access daily_salary
+            const employee = await EmployeeModel.getEmployeeById(employee_id);
+            if (!employee) {
+                return res.status(404).json({ success: false, message: 'Employee not found.' });
+            }
 
-            // 2. Get Total Undeducted Advances
+            const dailySalary = parseFloat(employee.daily_salary) || 0;
+            const hourlyRate = dailySalary / 10; // Calculate hourly rate
+
+            // 1. Get daily work records for the date range
+            const dailyRecords = await EmployeeModel.getDailyWorkRecords(employee_id, startDate, endDate);
+
+            // 2. Process daily records and create day-by-day breakdown
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const dailyBreakdown = [];
+            let totalDays = 0;
+            let totalHours = 0;
+            let totalAmount = 0;
+
+            // Create a map of existing records by date
+            const recordsByDate = {};
+            dailyRecords.forEach(record => {
+                // Handle both Date objects and string dates
+                const dateStr = record.work_date instanceof Date 
+                    ? record.work_date.toISOString().split('T')[0]
+                    : record.work_date.split('T')[0];
+                recordsByDate[dateStr] = record;
+            });
+
+            // Generate all days in the range (including days with no records)
+            const start = new Date(startDate);
+            const end = new Date(endDate);
+            const allDays = [];
+
+            for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                const dateStr = d.toISOString().split('T')[0];
+                const dayOfWeek = d.getDay();
+                const dayName = dayNames[dayOfWeek];
+                
+                if (recordsByDate[dateStr]) {
+                    // Record exists for this day
+                    const record = recordsByDate[dateStr];
+                    const workingHours = parseFloat(record.working_hours) || 0;
+                    const overtimeHours = parseFloat(record.overtime_hours) || 0;
+                    const amount = parseFloat(record.daily_salary_paid) || 0;
+                    
+                    // Calculate days worked (1 day = 10 hours, 0.5 day = 5 hours, etc.)
+                    const daysWorked = workingHours / 10;
+                    
+                    totalDays += daysWorked;
+                    totalHours += workingHours;
+                    totalAmount += amount;
+
+                    dailyBreakdown.push({
+                        day_name: dayName,
+                        date: dateStr,
+                        hours: parseFloat(workingHours.toFixed(2)),
+                        overtime_hours: parseFloat(overtimeHours.toFixed(2)),
+                        days: parseFloat(daysWorked.toFixed(2)),
+                        amount: parseFloat(amount.toFixed(2))
+                    });
+                } else {
+                    // No record for this day
+                    dailyBreakdown.push({
+                        day_name: dayName,
+                        date: dateStr,
+                        hours: 0,
+                        overtime_hours: 0,
+                        days: 0,
+                        amount: 0
+                    });
+                }
+            }
+
+            // 3. Calculate Gross Weekly Earning (sum of all daily amounts)
+            const grossSalary = totalAmount;
+
+            // 4. Get Total Undeducted Advances
             const advancesToDeduct = await EmployeeModel.getTotalUndeductedAdvances(employee_id);
 
-            // 3. Calculate Net Payout
+            // 5. Calculate Net Payout
             let netPayout = grossSalary - advancesToDeduct;
             netPayout = parseFloat(netPayout.toFixed(2));
 
-            // 4. Mark advances as deducted (Crucial final step)
+            // 6. Mark advances as deducted (Crucial final step)
             let advancesMarked = 0;
-            if (advancesToDeduct > 0 && netPayout >= 0) { // Only mark if there's a positive or zero net payout 
+            if (advancesToDeduct > 0 && netPayout >= 0) {
                 advancesMarked = await EmployeeModel.markAdvancesAsDeducted(employee_id);
             }
 
@@ -243,10 +483,19 @@ const employeeController = {
                 success: true,
                 data: {
                     employee_id,
+                    employee_name: employee.name || null,
+                    daily_salary: dailySalary,
+                    hourly_rate: parseFloat(hourlyRate.toFixed(2)),
                     week_start: startDate,
                     week_end: endDate,
-                    gross_salary: grossSalary,
-                    advances_deducted: advancesToDeduct,
+                    daily_breakdown: dailyBreakdown,
+                    totals: {
+                        total_days: parseFloat(totalDays.toFixed(2)),
+                        total_hours: parseFloat(totalHours.toFixed(2)),
+                        total_amount: parseFloat(totalAmount.toFixed(2))
+                    },
+                    gross_salary: parseFloat(grossSalary.toFixed(2)),
+                    advances_deducted: parseFloat(advancesToDeduct.toFixed(2)),
                     net_payout: netPayout,
                     advances_marked_as_paid: advancesMarked,
                     notes: advancesMarked > 0 ? 'Pending advances have been marked as deducted.' : 'No advances deducted this cycle.'
@@ -255,6 +504,121 @@ const employeeController = {
 
         } catch (error) {
             console.error('Error in getWeeklySalary:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
+    },
+
+    getSalaryTable: async (req, res) => {
+        const { startDate, endDate } = req.body;
+
+        if (!startDate || !endDate) {
+            return res.status(400).json({ success: false, message: 'startDate and endDate are required.' });
+        }
+
+        try {
+            // Get all employees
+            const employees = await EmployeeModel.getAllEmployees();
+            
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            const salaryTable = [];
+
+            // Process each employee
+            for (const employee of employees) {
+                const employee_id = employee.id;
+                const dailySalary = parseFloat(employee.daily_salary) || 0;
+                const hourlyRate = dailySalary / 10;
+
+                // Get daily work records for this employee
+                const dailyRecords = await EmployeeModel.getDailyWorkRecords(employee_id, startDate, endDate);
+
+                // Create a map of existing records by date
+                const recordsByDate = {};
+                dailyRecords.forEach(record => {
+                    // Handle both Date objects and string dates
+                    const dateStr = record.work_date instanceof Date 
+                        ? record.work_date.toISOString().split('T')[0]
+                        : record.work_date.split('T')[0];
+                    recordsByDate[dateStr] = record;
+                });
+
+                // Generate all days in the range
+                const start = new Date(startDate);
+                const end = new Date(endDate);
+                const dailyData = {};
+                let totalDays = 0;
+                let totalHours = 0;
+                let totalAmount = 0;
+
+                for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+                    const dateStr = d.toISOString().split('T')[0];
+                    const dayOfWeek = d.getDay();
+                    const dayName = dayNames[dayOfWeek];
+                    
+                    if (recordsByDate[dateStr]) {
+                        const record = recordsByDate[dateStr];
+                        const workingHours = parseFloat(record.working_hours) || 0;
+                        const overtimeHours = parseFloat(record.overtime_hours) || 0;
+                        const amount = parseFloat(record.daily_salary_paid) || 0;
+                        const daysWorked = workingHours / 10;
+                        
+                        totalDays += daysWorked;
+                        totalHours += workingHours;
+                        totalAmount += amount;
+
+                        dailyData[dayName.toLowerCase()] = {
+                            date: dateStr,
+                            hours: parseFloat(workingHours.toFixed(2)),
+                            overtime_hours: parseFloat(overtimeHours.toFixed(2)),
+                            days: parseFloat(daysWorked.toFixed(2)),
+                            amount: parseFloat(amount.toFixed(2))
+                        };
+                    } else {
+                        dailyData[dayName.toLowerCase()] = {
+                            date: dateStr,
+                            hours: 0,
+                            overtime_hours: 0,
+                            days: 0,
+                            amount: 0
+                        };
+                    }
+                }
+
+                salaryTable.push({
+                    employee_id: employee_id,
+                    employee_name: employee.name || 'Unknown',
+                    daily_salary: dailySalary,
+                    hourly_rate: parseFloat(hourlyRate.toFixed(2)),
+                    mon: dailyData.mon || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    tue: dailyData.tue || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    wed: dailyData.wed || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    thu: dailyData.thu || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    fri: dailyData.fri || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    sat: dailyData.sat || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    sun: dailyData.sun || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    total_days: parseFloat(totalDays.toFixed(2)),
+                    total_hours: parseFloat(totalHours.toFixed(2)),
+                    total_amount: parseFloat(totalAmount.toFixed(2))
+                });
+            }
+
+            await logUserActivity(req, {
+                model_name: 'salary_table',
+                action_type: 'REPORT',
+                record_id: null,
+                description: `Generated salary table for period ${startDate} to ${endDate}`
+            });
+
+            res.status(200).json({
+                success: true,
+                data: {
+                    week_start: startDate,
+                    week_end: endDate,
+                    employees: salaryTable
+                }
+            });
+
+        } catch (error) {
+            console.error('Error in getSalaryTable:', error);
             res.status(500).json({ success: false, message: 'Server Error', error: error.message });
         }
     },

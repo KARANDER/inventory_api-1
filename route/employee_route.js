@@ -46,8 +46,14 @@ router.post('/delete', checkPermission(permission), employeeController.deleteEmp
 // Consolidated API for adding daily work record AND optional advance
 router.post('/dailyTransaction', checkPermission(permission), employeeController.dailyTransaction);
 
+// Batch API for adding multiple daily work records at once (e.g., weekend records)
+router.post('/batchDailyTransaction', checkPermission(permission), employeeController.batchDailyTransaction);
+
 // Get Weekly Salary Summary and finalize payment (Gross - Advance = Net)
 router.post('/getWeeklySalary', checkPermission(permission), employeeController.getWeeklySalary);
+
+// Get Salary Table for multiple employees (for UI table display)
+router.post('/getSalaryTable', checkPermission(permission), employeeController.getSalaryTable);
 
 router.post('/getAllWorkRecords', checkPermission(permission), employeeController.getAllWorkRecords);
 
