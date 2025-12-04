@@ -69,6 +69,11 @@ const employeeController = {
                 return res.status(400).json({ success: false, message: 'Employee ID is required in the body.' });
             }
 
+            // Check if there are any fields to update
+            if (Object.keys(updateData).length === 0) {
+                return res.status(400).json({ success: false, message: 'No fields provided to update. Please provide at least one field to update.' });
+            }
+
             const oldRecord = await EmployeeModel.getEmployeeById(id);
             if (!oldRecord) {
                 return res.status(404).json({ success: false, message: 'Employee not found' });

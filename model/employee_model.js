@@ -59,7 +59,13 @@ const EmployeeModel = {
    * @returns {number} Number of affected rows (0 or 1).
    */
   updateEmployee: async (id, updateData) => {
-    const updates = Object.keys(updateData).map(key => `${key} = ?`).join(', ');
+    // Safety check: ensure there are fields to update
+    const updateKeys = Object.keys(updateData);
+    if (updateKeys.length === 0) {
+      throw new Error('No fields provided to update');
+    }
+
+    const updates = updateKeys.map(key => `${key} = ?`).join(', ');
     const values = [...Object.values(updateData), id];
     const query = `UPDATE employees SET ${updates} WHERE id = ?`;
     const [result] = await db.query(query, values);
@@ -67,13 +73,38 @@ const EmployeeModel = {
   },
 
   /**
-   * Deactivates (soft delete) an employee record.
+   * Deletes an employee record and all related records (work records and advances).
    * @param {number} id - Employee ID.
    * @returns {number} Number of affected rows (0 or 1).
    */
   deleteEmployee: async (id) => {
-    const [result] = await db.query('DELETE FROM employees WHERE id = ?', [id]);
-    return result.affectedRows;
+    // Start a transaction to ensure all deletions succeed or fail together
+    const connection = await db.getConnection();
+    
+    try {
+      await connection.beginTransaction();
+
+      // 1. Delete all work records for this employee
+      await connection.query('DELETE FROM employee_work_records WHERE employee_id = ?', [id]);
+
+      // 2. Delete all advances for this employee
+      await connection.query('DELETE FROM employee_advances WHERE employee_id = ?', [id]);
+
+      // 3. Delete the employee record
+      const [result] = await connection.query('DELETE FROM employees WHERE id = ?', [id]);
+
+      // Commit the transaction
+      await connection.commit();
+      
+      return result.affectedRows;
+    } catch (error) {
+      // Rollback the transaction on error
+      await connection.rollback();
+      throw error;
+    } finally {
+      // Release the connection back to the pool
+      connection.release();
+    }
   },
 
 
