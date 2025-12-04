@@ -55,6 +55,12 @@ router.post('/getWeeklySalary', checkPermission(permission), employeeController.
 // Get Salary Table for multiple employees (for UI table display)
 router.post('/getSalaryTable', checkPermission(permission), employeeController.getSalaryTable);
 
+// Save weekly salary data (batch save for a week)
+router.post('/saveWeeklySalary', checkPermission(permission), employeeController.saveWeeklySalary);
+
+// Get all weeks with salary data
+router.post('/getAllSalaryWeeks', checkPermission(permission), employeeController.getAllSalaryWeeks);
+
 router.post('/getAllWorkRecords', checkPermission(permission), employeeController.getAllWorkRecords);
 
 

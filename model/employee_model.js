@@ -174,6 +174,66 @@ const EmployeeModel = {
     return rows;
   },
 
+  /**
+   * Updates an existing work record for an employee on a specific date.
+   * @param {number} employeeId - ID of the employee.
+   * @param {string} workDate - Work date (YYYY-MM-DD).
+   * @param {object} updateData - Data to update.
+   * @returns {number} Number of affected rows.
+   */
+  updateWorkRecord: async (employeeId, workDate, updateData) => {
+    const updates = Object.keys(updateData).map(key => `${key} = ?`).join(', ');
+    const values = [...Object.values(updateData), employeeId, workDate];
+    const query = `UPDATE employee_work_records SET ${updates} WHERE employee_id = ? AND work_date = ?`;
+    const [result] = await db.query(query, values);
+    return result.affectedRows;
+  },
+
+  /**
+   * Gets all unique weeks (Monday to Sunday) that have work records.
+   * @returns {Array<object>} List of weeks with start and end dates.
+   */
+  getAllSalaryWeeks: async () => {
+    // Get all unique dates from work records
+    const query = `
+      SELECT DISTINCT work_date 
+      FROM employee_work_records 
+      ORDER BY work_date DESC
+    `;
+    const [rows] = await db.query(query);
+    
+    // Group dates into weeks (Monday to Sunday)
+    const weekMap = new Map();
+    
+    rows.forEach(row => {
+      const date = new Date(row.work_date);
+      const day = date.getDay();
+      const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Get Monday of the week
+      const monday = new Date(date);
+      monday.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
+      monday.setHours(0, 0, 0, 0);
+      const weekStart = monday.toISOString().split('T')[0];
+      
+      // Calculate Sunday (end of week)
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+      const weekEnd = sunday.toISOString().split('T')[0];
+      
+      if (!weekMap.has(weekStart)) {
+        weekMap.set(weekStart, {
+          week_start: weekStart,
+          week_end: weekEnd,
+          week_number: weekMap.size + 1
+        });
+      }
+    });
+    
+    // Convert map to array and sort by date (most recent first)
+    return Array.from(weekMap.values()).sort((a, b) => 
+      new Date(b.week_start) - new Date(a.week_start)
+    );
+  },
+
 
   // --- ADVANCES (Deduction Tracking) METHODS ---
 

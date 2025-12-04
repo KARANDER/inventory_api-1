@@ -570,8 +570,14 @@ const employeeController = {
                         totalHours += workingHours;
                         totalAmount += amount;
 
+                        // Format for frontend: "days/hours" (e.g., "1/3" means 1 day, 3 hours overtime)
+                        const daysValue = daysWorked.toFixed(1);
+                        const hoursValue = Math.abs(overtimeHours).toFixed(0);
+                        const displayValue = `${daysValue}/${hoursValue}`;
+
                         dailyData[dayName.toLowerCase()] = {
                             date: dateStr,
+                            value: displayValue, // Frontend format: "days/hours"
                             hours: parseFloat(workingHours.toFixed(2)),
                             overtime_hours: parseFloat(overtimeHours.toFixed(2)),
                             days: parseFloat(daysWorked.toFixed(2)),
@@ -580,6 +586,7 @@ const employeeController = {
                     } else {
                         dailyData[dayName.toLowerCase()] = {
                             date: dateStr,
+                            value: "0/0", // Frontend format
                             hours: 0,
                             overtime_hours: 0,
                             days: 0,
@@ -593,13 +600,13 @@ const employeeController = {
                     employee_name: employee.name || 'Unknown',
                     daily_salary: dailySalary,
                     hourly_rate: parseFloat(hourlyRate.toFixed(2)),
-                    mon: dailyData.mon || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
-                    tue: dailyData.tue || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
-                    wed: dailyData.wed || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
-                    thu: dailyData.thu || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
-                    fri: dailyData.fri || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
-                    sat: dailyData.sat || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
-                    sun: dailyData.sun || { date: '', hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    mon: dailyData.mon || { date: '', value: "0/0", hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    tue: dailyData.tue || { date: '', value: "0/0", hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    wed: dailyData.wed || { date: '', value: "0/0", hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    thu: dailyData.thu || { date: '', value: "0/0", hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    fri: dailyData.fri || { date: '', value: "0/0", hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    sat: dailyData.sat || { date: '', value: "0/0", hours: 0, overtime_hours: 0, days: 0, amount: 0 },
+                    sun: dailyData.sun || { date: '', value: "0/0", hours: 0, overtime_hours: 0, days: 0, amount: 0 },
                     total_days: parseFloat(totalDays.toFixed(2)),
                     total_hours: parseFloat(totalHours.toFixed(2)),
                     total_amount: parseFloat(totalAmount.toFixed(2))
@@ -624,6 +631,226 @@ const employeeController = {
 
         } catch (error) {
             console.error('Error in getSalaryTable:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
+    },
+
+    // Save weekly salary data (batch save for a week)
+    saveWeeklySalary: async (req, res) => {
+        try {
+            const { week_start, week_end, employees_data } = req.body;
+
+            if (!week_start || !week_end || !employees_data || !Array.isArray(employees_data)) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'week_start, week_end, and employees_data array are required.' 
+                });
+            }
+
+            const results = [];
+            const errors = [];
+            let successCount = 0;
+            let failCount = 0;
+
+            // Day name to day index mapping (0 = Sunday, 1 = Monday, etc.)
+            const dayNameToIndex = { 'sun': 0, 'mon': 1, 'tue': 2, 'wed': 3, 'thu': 4, 'fri': 5, 'sat': 6 };
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            // Process each employee's data
+            for (const empData of employees_data) {
+                const { employee_id, days } = empData; // days: { mon: "1/3", tue: "0.5/-1", ... }
+
+                if (!employee_id || !days) {
+                    errors.push({
+                        employee_id: employee_id || 'unknown',
+                        error: 'employee_id and days object are required.'
+                    });
+                    failCount++;
+                    continue;
+                }
+
+                // Verify employee exists
+                const employee = await EmployeeModel.getEmployeeById(employee_id);
+                if (!employee) {
+                    errors.push({
+                        employee_id: employee_id,
+                        error: 'Employee not found.'
+                    });
+                    failCount++;
+                    continue;
+                }
+
+                const dailySalary = parseFloat(employee.daily_salary) || 0;
+                const employeeRecords = [];
+
+                // Process each day (mon, tue, wed, etc.)
+                for (const [dayName, value] of Object.entries(days)) {
+                    if (!value || value === "0/0" || value === "") continue; // Skip empty days
+
+                    // Parse "days/hours" format (e.g., "1/3" or "0.5/-1")
+                    const parts = value.split('/');
+                    if (parts.length !== 2) {
+                        errors.push({
+                            employee_id: employee_id,
+                            day: dayName,
+                            error: `Invalid format for ${dayName}. Expected "days/hours" format.`
+                        });
+                        continue;
+                    }
+
+                    const daysValue = parseFloat(parts[0]) || 0;
+                    const overtimeHours = parseFloat(parts[1]) || 0;
+
+                    if (daysValue === 0 && overtimeHours === 0) continue; // Skip if no work
+
+                    // Calculate the date for this day
+                    const weekStart = new Date(week_start);
+                    const dayIndex = dayNameToIndex[dayName.toLowerCase()];
+                    if (dayIndex === undefined) {
+                        errors.push({
+                            employee_id: employee_id,
+                            day: dayName,
+                            error: `Invalid day name: ${dayName}`
+                        });
+                        continue;
+                    }
+
+                    // Calculate date: week_start + dayIndex days
+                    const workDate = new Date(weekStart);
+                    workDate.setDate(weekStart.getDate() + dayIndex);
+                    const dateStr = workDate.toISOString().split('T')[0];
+
+                    // Calculate total working hours: (days * 10) + overtime_hours
+                    const totalWorkingHours = (daysValue * 10) + overtimeHours;
+
+                    if (totalWorkingHours < 0) {
+                        errors.push({
+                            employee_id: employee_id,
+                            day: dayName,
+                            date: dateStr,
+                            error: `Invalid hours calculation: ${daysValue} day(s) + ${overtimeHours} overtime = ${totalWorkingHours} hours. Total hours cannot be negative.`
+                        });
+                        continue;
+                    }
+
+                    // Calculate daily salary paid
+                    const { calculateDailyPay } = require('../utils/hourlyRateCalculator');
+                    const daily_salary_paid = calculateDailyPay(dailySalary, daysValue * 10, overtimeHours);
+
+                    employeeRecords.push({
+                        employee_id,
+                        work_date: dateStr,
+                        days: daysValue,
+                        overtime_hours: overtimeHours,
+                        working_hours: totalWorkingHours,
+                        daily_salary_paid
+                    });
+                }
+
+                // Save all records for this employee
+                if (employeeRecords.length > 0) {
+                    try {
+                        for (const record of employeeRecords) {
+                            const { work_date, days, overtime_hours, working_hours, daily_salary_paid } = record;
+                            
+                            // Check if record already exists
+                            const existingRecords = await EmployeeModel.getDailyWorkRecords(employee_id, work_date, work_date);
+                            
+                            if (existingRecords.length > 0) {
+                                // Update existing record
+                                await EmployeeModel.updateWorkRecord(employee_id, work_date, {
+                                    working_hours,
+                                    overtime_hours,
+                                    daily_salary_paid
+                                });
+                            } else {
+                                // Create new record
+                                await EmployeeModel.createWorkRecord({
+                                    employee_id,
+                                    work_date,
+                                    working_hours,
+                                    overtime_hours,
+                                    daily_salary_paid
+                                });
+                            }
+                        }
+
+                        results.push({
+                            employee_id,
+                            employee_name: employee.name,
+                            records_saved: employeeRecords.length,
+                            status: 'Success'
+                        });
+                        successCount++;
+                    } catch (error) {
+                        if (error.code === 'ER_DUP_ENTRY') {
+                            errors.push({
+                                employee_id,
+                                error: `Duplicate entry for employee ${employee_id}. Some records may already exist.`
+                            });
+                        } else {
+                            errors.push({
+                                employee_id,
+                                error: error.message || 'Failed to save records.'
+                            });
+                        }
+                        failCount++;
+                    }
+                }
+            }
+
+            await logUserActivity(req, {
+                model_name: 'weekly_salary',
+                action_type: 'BATCH_CREATE',
+                record_id: null,
+                description: `Saved weekly salary data for ${employees_data.length} employees (${successCount} succeeded, ${failCount} failed) for week ${week_start} to ${week_end}`
+            });
+
+            const response = {
+                success: failCount === 0,
+                message: `Processed ${employees_data.length} employees: ${successCount} succeeded, ${failCount} failed.`,
+                summary: {
+                    total: employees_data.length,
+                    succeeded: successCount,
+                    failed: failCount
+                },
+                results: results,
+                errors: errors.length > 0 ? errors : undefined
+            };
+
+            const statusCode = failCount === 0 ? 201 : (successCount > 0 ? 207 : 400);
+            res.status(statusCode).json(response);
+
+        } catch (error) {
+            console.error('Error in saveWeeklySalary:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
+    },
+
+    // Get all weeks with salary data
+    getAllSalaryWeeks: async (req, res) => {
+        try {
+            // Get all unique weeks from work records
+            const weeks = await EmployeeModel.getAllSalaryWeeks();
+
+            // Get current week start (Monday)
+            const today = new Date();
+            const day = today.getDay();
+            const diff = today.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday
+            const currentMonday = new Date(today.setDate(diff));
+            currentMonday.setHours(0, 0, 0, 0);
+            const currentWeekStart = currentMonday.toISOString().split('T')[0];
+
+            res.status(200).json({
+                success: true,
+                data: {
+                    weeks: weeks,
+                    current_week_start: currentWeekStart
+                }
+            });
+
+        } catch (error) {
+            console.error('Error in getAllSalaryWeeks:', error);
             res.status(500).json({ success: false, message: 'Server Error', error: error.message });
         }
     },
