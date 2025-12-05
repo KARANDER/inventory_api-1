@@ -23,16 +23,36 @@ const employeeUploadFields = upload.fields([
 router.use(authMiddleware);
 
 // Define a new permission for employee management
-const permission = 'employee_management';
-
+const permission = 'employees';
 
 // --- 1. EMPLOYEE MANAGEMENT (CRUD) ---
 
-// Create Employee: Use the configured upload middleware before the controller
+// Helper middleware to conditionally use multer only for multipart/form-data
+const conditionalMulter = (req, res, next) => {
+    // Only use multer if Content-Type is multipart/form-data
+    if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
+        return employeeUploadFields(req, res, (err) => {
+            // Handle multer errors gracefully
+            if (err) {
+                console.error('Multer error:', err);
+                return res.status(400).json({ 
+                    success: false, 
+                    message: 'File upload error', 
+                    error: err.message 
+                });
+            }
+            next();
+        });
+    }
+    // Otherwise, skip multer and proceed
+    next();
+};
+
+// Create Employee: Handle both with and without trailing slash
 router.post(
     '/', 
-    checkPermission(permission), 
-    employeeUploadFields, // <-- NEW: Handles form-data and files
+    checkPermission(permission),
+    conditionalMulter,
     employeeController.createEmployee
 );
 // ... other CRUD routes remain the same ...

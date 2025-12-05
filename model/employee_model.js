@@ -190,7 +190,7 @@ const EmployeeModel = {
   },
 
   /**
-   * Gets all unique weeks (Monday to Sunday) that have work records.
+   * Gets all unique weeks (Saturday to Friday) that have work records.
    * @returns {Array<object>} List of weeks with start and end dates.
    */
   getAllSalaryWeeks: async () => {
@@ -202,22 +202,30 @@ const EmployeeModel = {
     `;
     const [rows] = await db.query(query);
     
-    // Group dates into weeks (Monday to Sunday)
+    // Group dates into weeks (Saturday to Friday)
     const weekMap = new Map();
     
     rows.forEach(row => {
       const date = new Date(row.work_date);
-      const day = date.getDay();
-      const diff = date.getDate() - day + (day === 0 ? -6 : 1); // Get Monday of the week
-      const monday = new Date(date);
-      monday.setDate(date.getDate() - day + (day === 0 ? -6 : 1));
-      monday.setHours(0, 0, 0, 0);
-      const weekStart = monday.toISOString().split('T')[0];
+      const day = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+      // Calculate days to subtract to get to Saturday
+      // Saturday (6): 0 days
+      // Sunday (0): -1 day (go back 1)
+      // Monday (1): -2 days (go back 2)
+      // Tuesday (2): -3 days (go back 3)
+      // Wednesday (3): -4 days (go back 4)
+      // Thursday (4): -5 days (go back 5)
+      // Friday (5): -6 days (go back 6)
+      const daysToSaturday = day === 6 ? 0 : -(day + 1);
+      const saturday = new Date(date);
+      saturday.setDate(date.getDate() + daysToSaturday);
+      saturday.setHours(0, 0, 0, 0);
+      const weekStart = saturday.toISOString().split('T')[0];
       
-      // Calculate Sunday (end of week)
-      const sunday = new Date(monday);
-      sunday.setDate(monday.getDate() + 6);
-      const weekEnd = sunday.toISOString().split('T')[0];
+      // Calculate Friday (end of week = Saturday + 6 days)
+      const friday = new Date(saturday);
+      friday.setDate(saturday.getDate() + 6);
+      const weekEnd = friday.toISOString().split('T')[0];
       
       if (!weekMap.has(weekStart)) {
         weekMap.set(weekStart, {
