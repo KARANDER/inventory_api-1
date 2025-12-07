@@ -24,3 +24,4 @@ router.post('/delete', checkPermission(permission), paymentMethodController.dele
 
 module.exports = router;
 
+

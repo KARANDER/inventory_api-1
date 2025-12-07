@@ -161,3 +161,4 @@ const JournalEntryModel = {
 
 module.exports = JournalEntryModel;
 
+

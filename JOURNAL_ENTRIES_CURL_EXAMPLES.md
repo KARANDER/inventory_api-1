@@ -220,3 +220,4 @@ curl -X POST http://localhost:3000/journal-entries/getAll \
   -d '{}'
 ```
 
+

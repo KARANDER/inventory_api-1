@@ -30,3 +30,4 @@ router.post('/getMetrics', checkPermission(permission), journalEntryController.g
 
 module.exports = router;
 
+

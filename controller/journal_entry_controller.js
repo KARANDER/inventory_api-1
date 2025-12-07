@@ -197,3 +197,4 @@ const journalEntryController = {
 
 module.exports = journalEntryController;
 
+

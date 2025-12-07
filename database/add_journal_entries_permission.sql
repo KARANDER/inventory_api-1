@@ -10,3 +10,4 @@ FROM users
 WHERE email = 'your-email@example.com'
 ON DUPLICATE KEY UPDATE permission_name = permission_name;
 
+
