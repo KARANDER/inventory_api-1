@@ -16,7 +16,7 @@ const upload = require('../middlewares/upload'); // Assuming upload.js is in the
 const employeeUploadFields = upload.fields([
     { name: 'profile_photo', maxCount: 1 },
     { name: 'document_photos', maxCount: 5 } // Assuming max 5 document photos
-]); 
+]);
 // --- END NEW/REVISED CODE ---
 
 // All routes for this module require authentication
@@ -35,10 +35,10 @@ const conditionalMulter = (req, res, next) => {
             // Handle multer errors gracefully
             if (err) {
                 console.error('Multer error:', err);
-                return res.status(400).json({ 
-                    success: false, 
-                    message: 'File upload error', 
-                    error: err.message 
+                return res.status(400).json({
+                    success: false,
+                    message: 'File upload error',
+                    error: err.message
                 });
             }
             next();
@@ -50,38 +50,12 @@ const conditionalMulter = (req, res, next) => {
 
 // Create Employee: Handle both with and without trailing slash
 router.post(
-    '/', 
+    '/',
     checkPermission(permission),
     conditionalMulter,
     employeeController.createEmployee
 );
-// ... other CRUD routes remain the same ...
+// Get all employees
 router.post('/getAll', checkPermission(permission), employeeController.getAllEmployees);
-router.post('/update', checkPermission(permission), employeeController.updateEmployee);
-router.post('/delete', checkPermission(permission), employeeController.deleteEmployee);
-
-
-// --- 2. CONSOLIDATED PAYROLL APIS ---
-
-// Consolidated API for adding daily work record AND optional advance
-router.post('/dailyTransaction', checkPermission(permission), employeeController.dailyTransaction);
-
-// Batch API for adding multiple daily work records at once (e.g., weekend records)
-router.post('/batchDailyTransaction', checkPermission(permission), employeeController.batchDailyTransaction);
-
-// Get Weekly Salary Summary and finalize payment (Gross - Advance = Net)
-router.post('/getWeeklySalary', checkPermission(permission), employeeController.getWeeklySalary);
-
-// Get Salary Table for multiple employees (for UI table display)
-router.post('/getSalaryTable', checkPermission(permission), employeeController.getSalaryTable);
-
-// Save weekly salary data (batch save for a week)
-router.post('/saveWeeklySalary', checkPermission(permission), employeeController.saveWeeklySalary);
-
-// Get all weeks with salary data
-router.post('/getAllSalaryWeeks', checkPermission(permission), employeeController.getAllSalaryWeeks);
-
-router.post('/getAllWorkRecords', checkPermission(permission), employeeController.getAllWorkRecords);
-
 
 module.exports = router;
