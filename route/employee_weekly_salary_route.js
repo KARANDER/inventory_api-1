@@ -23,6 +23,10 @@ router.post('/bulk-save', checkPermission(permission), employeeWeeklySalaryContr
 // GET /employee-weekly-salary/history?limit=10
 router.get('/history', checkPermission(permission), employeeWeeklySalaryController.getPastWeeksHistory);
 
+// Get all weeks data (current + past)
+// GET /employee-weekly-salary/all-weeks
+router.get('/all-weeks', checkPermission(permission), employeeWeeklySalaryController.getAllWeeksData);
+
 // Get salary data for a specific week
 // GET /employee-weekly-salary/week/2024-12-09
 router.get('/week/:weekStartDate', checkPermission(permission), employeeWeeklySalaryController.getWeekData);

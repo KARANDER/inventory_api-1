@@ -49,6 +49,16 @@ const formatEmployeeRow = (row) => {
 const EmployeeWeeklySalaryModel = {
 
     /**
+     * Format date as YYYY-MM-DD (local timezone)
+     */
+    formatDate: (date) => {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    },
+
+    /**
      * Get Monday of current week
      */
     getCurrentWeekMonday: () => {
@@ -57,8 +67,7 @@ const EmployeeWeeklySalaryModel = {
         const diff = day === 0 ? -6 : 1 - day; // If Sunday, go back 6 days
         const monday = new Date(today);
         monday.setDate(today.getDate() + diff);
-        monday.setHours(0, 0, 0, 0);
-        return monday.toISOString().split('T')[0];
+        return EmployeeWeeklySalaryModel.formatDate(monday);
     },
 
     /**
@@ -70,8 +79,7 @@ const EmployeeWeeklySalaryModel = {
         const diff = day === 0 ? 0 : 7 - day; // If Sunday, stay; else go forward
         const sunday = new Date(today);
         sunday.setDate(today.getDate() + diff);
-        sunday.setHours(0, 0, 0, 0);
-        return sunday.toISOString().split('T')[0];
+        return EmployeeWeeklySalaryModel.formatDate(sunday);
     },
 
     /**
@@ -125,12 +133,22 @@ const EmployeeWeeklySalaryModel = {
 
 
     /**
+     * Helper to safely parse number, returns 0 for null/undefined/NaN
+     */
+    safeNum: (val) => {
+        if (val === null || val === undefined || val === '' || val === "") return 0;
+        const num = parseFloat(val);
+        return isNaN(num) ? 0 : num;
+    },
+
+    /**
      * Bulk save/update weekly salary data for multiple employees
      * @param {Array} employeesData - Array of employee salary data
      */
     bulkSaveWeeklySalary: async (employeesData) => {
         const weekStart = EmployeeWeeklySalaryModel.getCurrentWeekMonday();
         const weekEnd = EmployeeWeeklySalaryModel.getCurrentWeekSunday();
+        const safeNum = EmployeeWeeklySalaryModel.safeNum;
 
         const connection = await db.getConnection();
 
@@ -140,30 +158,32 @@ const EmployeeWeeklySalaryModel = {
             const results = [];
 
             for (const emp of employeesData) {
-                const {
-                    employee_id,
-                    daily_salary,
-                    mon_days = 0, mon_ot = 0,
-                    tue_days = 0, tue_ot = 0,
-                    wed_days = 0, wed_ot = 0,
-                    thu_days = 0, thu_ot = 0,
-                    fri_days = 0, fri_ot = 0,
-                    sat_days = 0, sat_ot = 0,
-                    sun_days = 0, sun_ot = 0
-                } = emp;
+                const employee_id = emp.employee_id;
+                const daily_salary = safeNum(emp.daily_salary);
+
+                // Safely parse all day values
+                const mon_days = safeNum(emp.mon_days);
+                const mon_ot = safeNum(emp.mon_ot);
+                const tue_days = safeNum(emp.tue_days);
+                const tue_ot = safeNum(emp.tue_ot);
+                const wed_days = safeNum(emp.wed_days);
+                const wed_ot = safeNum(emp.wed_ot);
+                const thu_days = safeNum(emp.thu_days);
+                const thu_ot = safeNum(emp.thu_ot);
+                const fri_days = safeNum(emp.fri_days);
+                const fri_ot = safeNum(emp.fri_ot);
+                const sat_days = safeNum(emp.sat_days);
+                const sat_ot = safeNum(emp.sat_ot);
+                const sun_days = safeNum(emp.sun_days);
+                const sun_ot = safeNum(emp.sun_ot);
 
                 // Calculate totals
-                const total_days = parseFloat(mon_days) + parseFloat(tue_days) + parseFloat(wed_days) +
-                    parseFloat(thu_days) + parseFloat(fri_days) + parseFloat(sat_days) +
-                    parseFloat(sun_days);
-
-                const total_ot = parseFloat(mon_ot) + parseFloat(tue_ot) + parseFloat(wed_ot) +
-                    parseFloat(thu_ot) + parseFloat(fri_ot) + parseFloat(sat_ot) +
-                    parseFloat(sun_ot);
+                const total_days = mon_days + tue_days + wed_days + thu_days + fri_days + sat_days + sun_days;
+                const total_ot = mon_ot + tue_ot + wed_ot + thu_ot + fri_ot + sat_ot + sun_ot;
 
                 // Calculate salary: (days * daily_salary) + (ot_hours * (daily_salary/10))
-                const perHour = parseFloat(daily_salary) / 10;
-                const total_salary = (total_days * parseFloat(daily_salary)) + (total_ot * perHour);
+                const perHour = daily_salary / 10;
+                const total_salary = (total_days * daily_salary) + (total_ot * perHour);
 
                 // Upsert query (INSERT or UPDATE if exists)
                 const query = `
@@ -221,7 +241,9 @@ const EmployeeWeeklySalaryModel = {
         const currentWeekStart = EmployeeWeeklySalaryModel.getCurrentWeekMonday();
 
         const query = `
-            SELECT DISTINCT week_start_date, week_end_date
+            SELECT DISTINCT 
+                DATE_FORMAT(week_start_date, '%Y-%m-%d') AS week_start_date, 
+                DATE_FORMAT(week_end_date, '%Y-%m-%d') AS week_end_date
             FROM employee_weekly_salary
             WHERE week_start_date < ?
             ORDER BY week_start_date DESC
@@ -237,6 +259,9 @@ const EmployeeWeeklySalaryModel = {
      * @param {string} weekStartDate - Monday date of the week (YYYY-MM-DD)
      */
     getWeekData: async (weekStartDate) => {
+        // Clean the date - extract just YYYY-MM-DD if timestamp is passed
+        const cleanDate = weekStartDate.split('T')[0];
+
         const query = `
             SELECT 
                 e.id AS employee_id,
@@ -269,18 +294,64 @@ const EmployeeWeeklySalaryModel = {
             ORDER BY e.name ASC
         `;
 
-        const [rows] = await db.query(query, [weekStartDate]);
+        const [rows] = await db.query(query, [cleanDate]);
 
         // Calculate week end date (Sunday = Monday + 6 days)
-        const startDate = new Date(weekStartDate);
+        const startDate = new Date(cleanDate + 'T00:00:00');
         const endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 6);
 
         return {
-            week_start_date: weekStartDate,
-            week_end_date: endDate.toISOString().split('T')[0],
+            week_start_date: cleanDate,
+            week_end_date: EmployeeWeeklySalaryModel.formatDate(endDate),
             employees: rows.map(formatEmployeeRow)
         };
+    },
+
+    /**
+     * Get all weeks data (current week + all past weeks)
+     * Returns current week first, then past weeks in descending order
+     */
+    getAllWeeksData: async () => {
+        const currentWeekStart = EmployeeWeeklySalaryModel.getCurrentWeekMonday();
+        const currentWeekEnd = EmployeeWeeklySalaryModel.getCurrentWeekSunday();
+
+        // Get all unique weeks from database
+        const weeksQuery = `
+            SELECT DISTINCT 
+                DATE_FORMAT(week_start_date, '%Y-%m-%d') AS week_start_date, 
+                DATE_FORMAT(week_end_date, '%Y-%m-%d') AS week_end_date
+            FROM employee_weekly_salary
+            ORDER BY week_start_date DESC
+        `;
+        const [pastWeeks] = await db.query(weeksQuery);
+
+        // Get current week data
+        const currentWeekData = await EmployeeWeeklySalaryModel.getCurrentWeekData();
+
+        // Build result with current week first
+        const allWeeks = [{
+            week_start_date: currentWeekStart,
+            week_end_date: currentWeekEnd,
+            is_current_week: true,
+            employees: currentWeekData.employees
+        }];
+
+        // Add past weeks data
+        for (const week of pastWeeks) {
+            // Skip if this is current week (already added)
+            if (week.week_start_date === currentWeekStart) continue;
+
+            const weekData = await EmployeeWeeklySalaryModel.getWeekData(week.week_start_date);
+            allWeeks.push({
+                week_start_date: week.week_start_date,
+                week_end_date: week.week_end_date,
+                is_current_week: false,
+                employees: weekData.employees
+            });
+        }
+
+        return allWeeks;
     }
 };
 

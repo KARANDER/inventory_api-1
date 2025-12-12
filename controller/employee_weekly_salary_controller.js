@@ -130,6 +130,28 @@ const employeeWeeklySalaryController = {
                 error: error.message
             });
         }
+    },
+
+    /**
+     * Get all weeks data (current + past)
+     * GET /employee-weekly-salary/all-weeks
+     */
+    getAllWeeksData: async (req, res) => {
+        try {
+            const data = await EmployeeWeeklySalaryModel.getAllWeeksData();
+
+            res.status(200).json({
+                success: true,
+                data: data
+            });
+        } catch (error) {
+            console.error('Error in getAllWeeksData:', error);
+            res.status(500).json({
+                success: false,
+                message: 'Server Error',
+                error: error.message
+            });
+        }
     }
 };
 
