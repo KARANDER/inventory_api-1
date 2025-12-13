@@ -3,7 +3,7 @@
 const db = require('../config/db'); // Assuming the database connection is available here
 
 const EmployeeModel = {
-  
+
   // --- EMPLOYEE (Master Data) METHODS ---
 
   /**
@@ -51,7 +51,7 @@ const EmployeeModel = {
     const [rows] = await db.query('SELECT * FROM employees');
     return rows;
   },
-  
+
   /**
    * Updates an existing employee record.
    * @param {number} id - Employee ID.
@@ -80,7 +80,7 @@ const EmployeeModel = {
   deleteEmployee: async (id) => {
     // Start a transaction to ensure all deletions succeed or fail together
     const connection = await db.getConnection();
-    
+
     try {
       await connection.beginTransaction();
 
@@ -95,7 +95,7 @@ const EmployeeModel = {
 
       // Commit the transaction
       await connection.commit();
-      
+
       return result.affectedRows;
     } catch (error) {
       // Rollback the transaction on error
@@ -201,10 +201,10 @@ const EmployeeModel = {
       ORDER BY work_date DESC
     `;
     const [rows] = await db.query(query);
-    
+
     // Group dates into weeks (Saturday to Friday)
     const weekMap = new Map();
-    
+
     rows.forEach(row => {
       const date = new Date(row.work_date);
       const day = date.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
@@ -221,12 +221,12 @@ const EmployeeModel = {
       saturday.setDate(date.getDate() + daysToSaturday);
       saturday.setHours(0, 0, 0, 0);
       const weekStart = saturday.toISOString().split('T')[0];
-      
+
       // Calculate Friday (end of week = Saturday + 6 days)
       const friday = new Date(saturday);
       friday.setDate(saturday.getDate() + 6);
       const weekEnd = friday.toISOString().split('T')[0];
-      
+
       if (!weekMap.has(weekStart)) {
         weekMap.set(weekStart, {
           week_start: weekStart,
@@ -235,9 +235,9 @@ const EmployeeModel = {
         });
       }
     });
-    
+
     // Convert map to array and sort by date (most recent first)
-    return Array.from(weekMap.values()).sort((a, b) => 
+    return Array.from(weekMap.values()).sort((a, b) =>
       new Date(b.week_start) - new Date(a.week_start)
     );
   },

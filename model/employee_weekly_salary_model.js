@@ -19,6 +19,11 @@ const formatEmployeeRow = (row) => {
     // Check if this employee has a salary record for this week
     const hasRecord = row.salary_record_id !== null;
 
+    // Calculate total_hours = (total_days * 10) + total_ot
+    const totalDays = hasRecord ? (parseFloat(row.total_days) || 0) : 0;
+    const totalOt = hasRecord ? (parseFloat(row.total_ot) || 0) : 0;
+    const totalHours = (totalDays * 10) + totalOt;
+
     return {
         employee_id: row.employee_id,
         employee_name: row.employee_name,
@@ -26,6 +31,11 @@ const formatEmployeeRow = (row) => {
         salary_record_id: row.salary_record_id || null,
         week_start_date: row.week_start_date ? (typeof row.week_start_date === 'string' ? row.week_start_date : row.week_start_date.toISOString().split('T')[0]) : null,
         week_end_date: row.week_end_date ? (typeof row.week_end_date === 'string' ? row.week_end_date : row.week_end_date.toISOString().split('T')[0]) : null,
+        // Week order: Sat, Sun, Mon, Tue, Wed, Thu, Fri
+        sat_days: hasRecord ? toNumOrEmpty(row.sat_days) : "",
+        sat_ot: hasRecord ? toNumOrEmpty(row.sat_ot) : "",
+        sun_days: hasRecord ? toNumOrEmpty(row.sun_days) : "",
+        sun_ot: hasRecord ? toNumOrEmpty(row.sun_ot) : "",
         mon_days: hasRecord ? toNumOrEmpty(row.mon_days) : "",
         mon_ot: hasRecord ? toNumOrEmpty(row.mon_ot) : "",
         tue_days: hasRecord ? toNumOrEmpty(row.tue_days) : "",
@@ -36,12 +46,9 @@ const formatEmployeeRow = (row) => {
         thu_ot: hasRecord ? toNumOrEmpty(row.thu_ot) : "",
         fri_days: hasRecord ? toNumOrEmpty(row.fri_days) : "",
         fri_ot: hasRecord ? toNumOrEmpty(row.fri_ot) : "",
-        sat_days: hasRecord ? toNumOrEmpty(row.sat_days) : "",
-        sat_ot: hasRecord ? toNumOrEmpty(row.sat_ot) : "",
-        sun_days: hasRecord ? toNumOrEmpty(row.sun_days) : "",
-        sun_ot: hasRecord ? toNumOrEmpty(row.sun_ot) : "",
         total_days: hasRecord ? toNumOrEmpty(row.total_days) : "",
         total_ot: hasRecord ? toNumOrEmpty(row.total_ot) : "",
+        total_hours: hasRecord ? totalHours : "",
         total_salary: hasRecord ? toNumOrEmpty(row.total_salary) : ""
     };
 };
@@ -59,27 +66,33 @@ const EmployeeWeeklySalaryModel = {
     },
 
     /**
-     * Get Monday of current week
+     * Get Saturday (start) of current week
+     * Week: Saturday to Friday
      */
-    getCurrentWeekMonday: () => {
+    getCurrentWeekStart: () => {
         const today = new Date();
         const day = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
-        const diff = day === 0 ? -6 : 1 - day; // If Sunday, go back 6 days
-        const monday = new Date(today);
-        monday.setDate(today.getDate() + diff);
-        return EmployeeWeeklySalaryModel.formatDate(monday);
+        // Calculate days to go back to Saturday
+        // Sat(6)=0, Sun(0)=1, Mon(1)=2, Tue(2)=3, Wed(3)=4, Thu(4)=5, Fri(5)=6
+        const diff = day === 6 ? 0 : -(day + 1);
+        const saturday = new Date(today);
+        saturday.setDate(today.getDate() + diff);
+        return EmployeeWeeklySalaryModel.formatDate(saturday);
     },
 
     /**
-     * Get Sunday of current week
+     * Get Friday (end) of current week
+     * Week: Saturday to Friday
      */
-    getCurrentWeekSunday: () => {
+    getCurrentWeekEnd: () => {
         const today = new Date();
-        const day = today.getDay();
-        const diff = day === 0 ? 0 : 7 - day; // If Sunday, stay; else go forward
-        const sunday = new Date(today);
-        sunday.setDate(today.getDate() + diff);
-        return EmployeeWeeklySalaryModel.formatDate(sunday);
+        const day = today.getDay(); // 0=Sun, 1=Mon, ..., 6=Sat
+        // Calculate days to go forward to Friday
+        // Sat(6)=6, Sun(0)=5, Mon(1)=4, Tue(2)=3, Wed(3)=2, Thu(4)=1, Fri(5)=0
+        const diff = day === 6 ? 6 : (5 - day);
+        const friday = new Date(today);
+        friday.setDate(today.getDate() + diff);
+        return EmployeeWeeklySalaryModel.formatDate(friday);
     },
 
     /**
@@ -87,8 +100,8 @@ const EmployeeWeeklySalaryModel = {
      * Returns all employees with their weekly salary data (empty slots if no data)
      */
     getCurrentWeekData: async () => {
-        const weekStart = EmployeeWeeklySalaryModel.getCurrentWeekMonday();
-        const weekEnd = EmployeeWeeklySalaryModel.getCurrentWeekSunday();
+        const weekStart = EmployeeWeeklySalaryModel.getCurrentWeekStart();
+        const weekEnd = EmployeeWeeklySalaryModel.getCurrentWeekEnd();
 
         const query = `
             SELECT 
@@ -146,8 +159,8 @@ const EmployeeWeeklySalaryModel = {
      * @param {Array} employeesData - Array of employee salary data
      */
     bulkSaveWeeklySalary: async (employeesData) => {
-        const weekStart = EmployeeWeeklySalaryModel.getCurrentWeekMonday();
-        const weekEnd = EmployeeWeeklySalaryModel.getCurrentWeekSunday();
+        const weekStart = EmployeeWeeklySalaryModel.getCurrentWeekStart();
+        const weekEnd = EmployeeWeeklySalaryModel.getCurrentWeekEnd();
         const safeNum = EmployeeWeeklySalaryModel.safeNum;
 
         const connection = await db.getConnection();
@@ -238,7 +251,7 @@ const EmployeeWeeklySalaryModel = {
      * @param {number} limit - Number of past weeks to fetch
      */
     getPastWeeksHistory: async (limit = 10) => {
-        const currentWeekStart = EmployeeWeeklySalaryModel.getCurrentWeekMonday();
+        const currentWeekStart = EmployeeWeeklySalaryModel.getCurrentWeekStart();
 
         const query = `
             SELECT DISTINCT 
@@ -296,7 +309,7 @@ const EmployeeWeeklySalaryModel = {
 
         const [rows] = await db.query(query, [cleanDate]);
 
-        // Calculate week end date (Sunday = Monday + 6 days)
+        // Calculate week end date (Friday = Saturday + 6 days)
         const startDate = new Date(cleanDate + 'T00:00:00');
         const endDate = new Date(startDate);
         endDate.setDate(startDate.getDate() + 6);
@@ -313,8 +326,8 @@ const EmployeeWeeklySalaryModel = {
      * Returns current week first, then past weeks in descending order
      */
     getAllWeeksData: async () => {
-        const currentWeekStart = EmployeeWeeklySalaryModel.getCurrentWeekMonday();
-        const currentWeekEnd = EmployeeWeeklySalaryModel.getCurrentWeekSunday();
+        const currentWeekStart = EmployeeWeeklySalaryModel.getCurrentWeekStart();
+        const currentWeekEnd = EmployeeWeeklySalaryModel.getCurrentWeekEnd();
 
         // Get all unique weeks from database
         const weeksQuery = `

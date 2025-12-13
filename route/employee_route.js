@@ -58,4 +58,13 @@ router.post(
 // Get all employees
 router.post('/getAll', checkPermission(permission), employeeController.getAllEmployees);
 
+// Get employee by ID
+router.post('/getById', checkPermission(permission), employeeController.getEmployeeById);
+
+// Update employee
+router.post('/update', checkPermission(permission), conditionalMulter, employeeController.updateEmployee);
+
+// Delete employee
+router.post('/delete', checkPermission(permission), employeeController.deleteEmployee);
+
 module.exports = router;

@@ -35,16 +35,18 @@ const checkPermission = require('../middlewares/checkPermission');
 const purchaseInvoiceController = require('../controller/puchase_invoice_controller');
 
 // POST to add invoice with items
-router.post('/',[authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.addInvoiceWithItems);
+router.post('/', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.addInvoiceWithItems);
 
 // POST to get invoice by id (id in body)
-router.post('/getPurchaseInvoice',[authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.getAllInvoicesWithItems);
+router.post('/getPurchaseInvoice', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.getAllInvoicesWithItems);
 
 // POST to update invoice (id in body)
-router.post('/updatePurchaseInvoice',[authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.updateInvoice);
+router.post('/updatePurchaseInvoice', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.updateInvoice);
 
 // POST to delete invoice (id in body)
-router.post('/deletePurchaseInvoice',[authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.deleteInvoice);
+router.post('/deletePurchaseInvoice', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.deleteInvoice);
+// POST to batch delete multiple invoices (ids array in body)
+router.post('/batchDeletePurchaseInvoices', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.batchDeleteInvoices);
 router.post('/getDataFromInventoryItem', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.getInventoryDetailsByCodeUser);
 router.post('/getSummaries', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.getInvoiceSummaries);
 router.post('/getUserCode', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.getUserCode);

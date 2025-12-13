@@ -58,6 +58,86 @@ const employeeController = {
             console.error('Error in getAllEmployees:', error);
             res.status(500).json({ success: false, message: 'Server Error', error: error.message });
         }
+    },
+
+    getEmployeeById: async (req, res) => {
+        try {
+            const { id } = req.body;
+            if (!id) {
+                return res.status(400).json({ success: false, message: 'Employee ID is required.' });
+            }
+            const employee = await EmployeeModel.getEmployeeById(id);
+            if (!employee) {
+                return res.status(404).json({ success: false, message: 'Employee not found.' });
+            }
+            res.status(200).json({ success: true, data: employee });
+        } catch (error) {
+            console.error('Error in getEmployeeById:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
+    },
+
+    updateEmployee: async (req, res) => {
+        try {
+            const { id, ...updateData } = req.body;
+            if (!id) {
+                return res.status(400).json({ success: false, message: 'Employee ID is required.' });
+            }
+
+            // Handle file uploads if present
+            const profileFile = req.files && req.files['profile_photo'] ? req.files['profile_photo'][0] : null;
+            const documentFiles = req.files && req.files['document_photos'] ? req.files['document_photos'] : [];
+
+            if (profileFile) {
+                updateData.profile_photo = profileFile.path;
+            }
+            if (documentFiles.length > 0) {
+                updateData.document_photos = JSON.stringify(documentFiles.map(f => f.path));
+            }
+
+            const affectedRows = await EmployeeModel.updateEmployee(id, updateData);
+            if (affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'Employee not found.' });
+            }
+
+            await logUserActivity(req, {
+                model_name: 'employees',
+                action_type: 'UPDATE',
+                record_id: id,
+                description: `Updated employee ID: ${id}`
+            });
+
+            res.status(200).json({ success: true, message: 'Employee updated successfully.' });
+        } catch (error) {
+            console.error('Error in updateEmployee:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
+    },
+
+    deleteEmployee: async (req, res) => {
+        try {
+            const { id } = req.body;
+            if (!id) {
+                return res.status(400).json({ success: false, message: 'Employee ID is required.' });
+            }
+
+            const affectedRows = await EmployeeModel.deleteEmployee(id);
+            if (affectedRows === 0) {
+                return res.status(404).json({ success: false, message: 'Employee not found.' });
+            }
+
+            await logUserActivity(req, {
+                model_name: 'employees',
+                action_type: 'DELETE',
+                record_id: id,
+                description: `Deleted employee ID: ${id}`
+            });
+
+            res.status(200).json({ success: true, message: 'Employee deleted successfully.' });
+        } catch (error) {
+            console.error('Error in deleteEmployee:', error);
+            res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+        }
     }
 };
 

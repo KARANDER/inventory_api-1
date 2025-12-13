@@ -9,10 +9,11 @@ const checkPermission = require('../middlewares/checkPermission'); // Optional
 // const permission = 'invoices';
 
 // All routes use the POST method as requested
-router.post('/', [authMiddleware, checkPermission('sales_invoices')],  invoiceController.createInvoice);
-router.post('/getAllInvoices',  [authMiddleware, checkPermission('sales_invoices')],  invoiceController.getAllInvoices);
-router.post('/updateInvoice',  [authMiddleware, checkPermission('sales_invoices')],  invoiceController.updateInvoice);
-router.post('/deleteInvoice',  [authMiddleware, checkPermission('sales_invoices')],  invoiceController.deleteInvoice);
+router.post('/', [authMiddleware, checkPermission('sales_invoices')], invoiceController.createInvoice);
+router.post('/getAllInvoices', [authMiddleware, checkPermission('sales_invoices')], invoiceController.getAllInvoices);
+router.post('/updateInvoice', [authMiddleware, checkPermission('sales_invoices')], invoiceController.updateInvoice);
+router.post('/deleteInvoice', [authMiddleware, checkPermission('sales_invoices')], invoiceController.deleteInvoice);
+router.post('/batchDeleteInvoices', [authMiddleware, checkPermission('sales_invoices')], invoiceController.batchDeleteInvoices);
 // router.post('/getInvoiceList',[authMiddleware, checkPermission('sales_invoices')], invoiceController.getInvoiceList);
 router.post(
   '/getInvoiceSummary',

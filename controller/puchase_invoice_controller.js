@@ -7,7 +7,7 @@ const processInvoiceItems = (items = []) => {
   if (!items || !Array.isArray(items)) {
     return [];
   }
-  
+
   return items.map(item => {
     // Ensure input values are treated as numbers
     const no_of_peti = parseFloat(item.no_of_peti) || 0;
@@ -75,45 +75,45 @@ const purchaseInvoiceController = {
 
   updateInvoice: async (req, res) => {
     try {
-        // Destructure the new deleted_item_ids array from the request body
-        const { id, line_items, deleted_item_ids, ...invoiceData } = req.body;
-        
-        if (!id) {
-            return res.status(400).json({ success: false, message: 'Invoice ID is required for update.' });
-        }
+      // Destructure the new deleted_item_ids array from the request body
+      const { id, line_items, deleted_item_ids, ...invoiceData } = req.body;
 
-        // Fetch old record before updating
-        const oldRecord = await PurchaseInvoice.findById(id);
-        if (!oldRecord) {
-            return res.status(404).json({ success: false, message: 'Purchase invoice not found' });
-        }
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'Invoice ID is required for update.' });
+      }
 
-        // Process items to add calculated fields before sending to the model
-        const processedItems = processInvoiceItems(line_items);
-        
-        const updatedInvoice = await PurchaseInvoice.updateWithItems(
-            id,
-            invoiceData,
-            processedItems,
-            deleted_item_ids // Pass the new array to the model
-        );
-        
-        // Compare old vs new values and log changes (excluding line_items)
-        const changes = compareChanges(oldRecord, invoiceData);
-        await logUserActivity(req, {
-          model_name: 'purchase_invoices',
-          action_type: 'UPDATE',
-          record_id: id,
-          description: 'Updated purchase invoice',
-          changes: changes
-        });
+      // Fetch old record before updating
+      const oldRecord = await PurchaseInvoice.findById(id);
+      if (!oldRecord) {
+        return res.status(404).json({ success: false, message: 'Purchase invoice not found' });
+      }
 
-        res.status(200).json({ success: true, message: 'Invoice updated successfully', data: updatedInvoice });
+      // Process items to add calculated fields before sending to the model
+      const processedItems = processInvoiceItems(line_items);
+
+      const updatedInvoice = await PurchaseInvoice.updateWithItems(
+        id,
+        invoiceData,
+        processedItems,
+        deleted_item_ids // Pass the new array to the model
+      );
+
+      // Compare old vs new values and log changes (excluding line_items)
+      const changes = compareChanges(oldRecord, invoiceData);
+      await logUserActivity(req, {
+        model_name: 'purchase_invoices',
+        action_type: 'UPDATE',
+        record_id: id,
+        description: 'Updated purchase invoice',
+        changes: changes
+      });
+
+      res.status(200).json({ success: true, message: 'Invoice updated successfully', data: updatedInvoice });
     } catch (error) {
-        console.error('Update Invoice Error:', error);
-        res.status(500).json({ success: false, message: 'Failed to update invoice', error: error.message });
+      console.error('Update Invoice Error:', error);
+      res.status(500).json({ success: false, message: 'Failed to update invoice', error: error.message });
     }
-},
+  },
 
   deleteInvoice: async (req, res) => {
     try {
@@ -137,43 +137,43 @@ const purchaseInvoiceController = {
 
   getInventoryDetailsByCodeUser: async (req, res) => {
     try {
-        const { code_user } = req.body;
-        if (!code_user) {
-            return res.status(400).json({ success: false, message: 'Item code is required.' });
-        }
-        const details = await PurchaseInvoice.getDetailsByCodeUser(code_user);
-        if (details) {
-            res.status(200).json({ success: true, data: details });
-        } else {
-            res.status(404).json({ success: false, message: 'Item not found.' });
-        }
+      const { code_user } = req.body;
+      if (!code_user) {
+        return res.status(400).json({ success: false, message: 'Item code is required.' });
+      }
+      const details = await PurchaseInvoice.getDetailsByCodeUser(code_user);
+      if (details) {
+        res.status(200).json({ success: true, data: details });
+      } else {
+        res.status(404).json({ success: false, message: 'Item not found.' });
+      }
     } catch (error) {
-        console.error('Error getting inventory details:', error);
-        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+      console.error('Error getting inventory details:', error);
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   },
   getInvoiceSummaries: async (req, res) => {
     try {
-        const summaries = await PurchaseInvoice.findAllWithTotalAmount();
-        res.status(200).json({ success: true, data: summaries });
+      const summaries = await PurchaseInvoice.findAllWithTotalAmount();
+      res.status(200).json({ success: true, data: summaries });
     } catch (error) {
-        console.error('Error fetching invoice summaries:', error);
-        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+      console.error('Error fetching invoice summaries:', error);
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   },
-   getUserCode: async (req, res) => {
+  getUserCode: async (req, res) => {
     try {
       const { user } = req.body;
-      
+
       if (!user) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'User parameter is required' 
+        return res.status(400).json({
+          success: false,
+          message: 'User parameter is required'
         });
       }
 
       const codeUsers = await PurchaseInvoice.findCodeUserByUser(user);
-      
+
       if (codeUsers.length > 0) {
         res.status(200).json({
           success: true,
@@ -186,11 +186,45 @@ const purchaseInvoiceController = {
         });
       }
     } catch (error) {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server Error', 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
       });
+    }
+  },
+
+  // Batch delete multiple purchase invoices
+  batchDeleteInvoices: async (req, res) => {
+    try {
+      const { ids } = req.body;
+
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'Request body must contain ids array.' });
+      }
+
+      let deletedCount = 0;
+      const failed = [];
+
+      for (const id of ids) {
+        try {
+          await PurchaseInvoice.deleteInvoice(id);
+          deletedCount++;
+          await logUserActivity(req, {
+            model_name: 'purchase_invoices',
+            action_type: 'DELETE',
+            record_id: id,
+            description: 'Deleted purchase invoice (batch)'
+          });
+        } catch (error) {
+          failed.push({ id, message: error.message });
+        }
+      }
+
+      res.status(200).json({ success: true, deletedCount, failed });
+
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   },
 
