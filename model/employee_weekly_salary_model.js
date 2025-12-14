@@ -322,39 +322,27 @@ const EmployeeWeeklySalaryModel = {
     },
 
     /**
-     * Get all weeks data (current week + all past weeks)
-     * Returns current week first, then past weeks in descending order
+     * Get all past weeks data (excludes current week)
+     * Returns past weeks in descending order (most recent first)
      */
     getAllWeeksData: async () => {
         const currentWeekStart = EmployeeWeeklySalaryModel.getCurrentWeekStart();
-        const currentWeekEnd = EmployeeWeeklySalaryModel.getCurrentWeekEnd();
 
-        // Get all unique weeks from database
+        // Get all unique past weeks from database (exclude current week)
         const weeksQuery = `
             SELECT DISTINCT 
                 DATE_FORMAT(week_start_date, '%Y-%m-%d') AS week_start_date, 
                 DATE_FORMAT(week_end_date, '%Y-%m-%d') AS week_end_date
             FROM employee_weekly_salary
+            WHERE week_start_date < ?
             ORDER BY week_start_date DESC
         `;
-        const [pastWeeks] = await db.query(weeksQuery);
+        const [pastWeeks] = await db.query(weeksQuery, [currentWeekStart]);
 
-        // Get current week data
-        const currentWeekData = await EmployeeWeeklySalaryModel.getCurrentWeekData();
+        const allWeeks = [];
 
-        // Build result with current week first
-        const allWeeks = [{
-            week_start_date: currentWeekStart,
-            week_end_date: currentWeekEnd,
-            is_current_week: true,
-            employees: currentWeekData.employees
-        }];
-
-        // Add past weeks data
+        // Add only past weeks data
         for (const week of pastWeeks) {
-            // Skip if this is current week (already added)
-            if (week.week_start_date === currentWeekStart) continue;
-
             const weekData = await EmployeeWeeklySalaryModel.getWeekData(week.week_start_date);
             allWeeks.push({
                 week_start_date: week.week_start_date,
