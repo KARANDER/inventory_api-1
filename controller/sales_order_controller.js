@@ -45,24 +45,24 @@ const salesOrderController = {
       if (!id) {
         return res.status(400).json({ success: false, message: 'Order ID is required in the body.' });
       }
-      
+
       // Fetch old record before updating
       const oldRecord = await SalesOrder.findById(id);
       if (!oldRecord) {
         return res.status(404).json({ success: false, message: 'Sales order not found' });
       }
-      
+
       // Map incoming fields to match model expectations
+      const { date, ...restData } = orderData;
       const mappedData = {
-        ...orderData,
-        order_date: orderData.date,
-        rate_kz: orderData.rate_kz
+        ...restData,
+        order_date: date || restData.order_date,
       };
       const affectedRows = await SalesOrder.update(id, mappedData);
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Sales order not found' });
       }
-      
+
       // Compare old vs new values and log changes
       const changes = compareChanges(oldRecord, mappedData);
       await logUserActivity(req, {
@@ -118,10 +118,10 @@ const salesOrderController = {
         }
 
         // Map incoming fields to match model expectations
+        const { date, ...restFields } = fieldsToUpdate;
         const mappedData = {
-          ...fieldsToUpdate,
-          order_date: fieldsToUpdate.date,
-          rate_kz: fieldsToUpdate.rate_kz
+          ...restFields,
+          order_date: date || restFields.order_date,
         };
         try {
           // Fetch old record before updating
@@ -130,7 +130,7 @@ const salesOrderController = {
             failed.push({ id, message: "Sales order not found" });
             continue;
           }
-          
+
           const affected = await SalesOrder.update(id, mappedData);
           if (affected === 0) {
             failed.push({ id, message: "Sales order not found" });
@@ -263,7 +263,7 @@ const salesOrderController = {
   getInventoryByCodeUser: async (req, res) => {
     try {
       const { code_user } = req.body;
-      
+
       if (!code_user) {
         return res.status(400).json({
           success: false,
@@ -272,7 +272,7 @@ const salesOrderController = {
       }
 
       const inventoryItem = await SalesOrder.getInventoryByCodeUser(code_user);
-      
+
       if (!inventoryItem) {
         return res.status(404).json({
           success: false,
@@ -307,31 +307,31 @@ const salesOrderController = {
       const { item_code } = req.body;
 
       if (!item_code) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'item_code is required in the request body.' 
+        return res.status(400).json({
+          success: false,
+          message: 'item_code is required in the request body.'
         });
       }
 
       const item = await SalesOrder.findStockByItemCode(item_code);
 
       if (!item) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Item not found.' 
+        return res.status(404).json({
+          success: false,
+          message: 'Item not found.'
         });
       }
 
-      res.status(200).json({ 
-        success: true, 
-        data: { stock_quantity: item.stock_quantity } 
+      res.status(200).json({
+        success: true,
+        data: { stock_quantity: item.stock_quantity }
       });
 
     } catch (error) {
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server Error', 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
       });
     }
   },

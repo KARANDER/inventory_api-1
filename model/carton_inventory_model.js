@@ -16,9 +16,9 @@ const CartonInventory = {
     return { id: result.insertId, ...cartonData };
   },
   findAllCartonNames: async () => {
-  const [rows] = await db.query('SELECT carton_name FROM carton_inventory');
-  return rows.map(row => row.carton_name);
-},
+    const [rows] = await db.query('SELECT carton_name FROM carton_inventory');
+    return rows.map(row => row.carton_name);
+  },
 
   // You can add findAll, update, and delete functions here later
 };
