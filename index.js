@@ -40,6 +40,7 @@ const employeeRoutes = require('./route/employee_route');
 const employeeWeeklySalaryRoutes = require('./route/employee_weekly_salary_route');
 const paymentMethodRoutes = require('./route/payment_method_route');
 const journalEntryRoutes = require('./route/journal_entry_route');
+const journalCustomerRoutes = require('./route/journal_customer_route');
 
 const PORT = process.env.PORT || 3000;
 
@@ -67,6 +68,7 @@ app.use('/employees', employeeRoutes);
 app.use('/employee-weekly-salary', employeeWeeklySalaryRoutes);
 app.use('/payment-methods', paymentMethodRoutes);
 app.use('/journal-entries', journalEntryRoutes);
+app.use('/journal-entries/customers', journalCustomerRoutes);
 
 // An async function to connect to the DB and then start the server
 const startServer = async () => {

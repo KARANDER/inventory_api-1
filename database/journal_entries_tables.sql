@@ -16,7 +16,6 @@ INSERT INTO payment_methods (name) VALUES
     ('Other')
 ON DUPLICATE KEY UPDATE name = name;
 
--- Journal Entries Table
 CREATE TABLE IF NOT EXISTS journal_entries (
     id INT AUTO_INCREMENT PRIMARY KEY,
     date DATE NOT NULL,
@@ -33,6 +32,16 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     INDEX idx_date (date),
     INDEX idx_type (type),
     INDEX idx_customer (customer_name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- Journal Customers Table (for Journal Entries customer dropdown)
+CREATE TABLE IF NOT EXISTS journal_customers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 
