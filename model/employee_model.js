@@ -43,12 +43,20 @@ const EmployeeModel = {
   },
 
   /**
-   * Retrieves all active employees.
-   * @returns {Array<object>} List of employees.
+   * Retrieves all active employees with their advance balance.
+   * @returns {Array<object>} List of employees with advance_balance.
    */
   getAllEmployees: async () => {
-    // Note: Assuming 'is_active = 1' is used for active employees
-    const [rows] = await db.query('SELECT * FROM employees');
+    const query = `
+      SELECT 
+        e.*,
+        COALESCE(SUM(ea.remaining_balance), 0) as advance_balance
+      FROM employees e
+      LEFT JOIN employee_advances ea ON e.id = ea.employee_id AND ea.status IN ('PENDING', 'PARTIAL')
+      GROUP BY e.id
+      ORDER BY e.name ASC
+    `;
+    const [rows] = await db.query(query);
     return rows;
   },
 
@@ -359,7 +367,7 @@ const EmployeeModel = {
       WHERE ea.id = ?
     `;
     const [rows] = await db.query(query, [advanceId]);
-    
+
     if (rows.length === 0) return null;
 
     // Get repayment history
@@ -370,7 +378,7 @@ const EmployeeModel = {
       ORDER BY date DESC
     `;
     const [repayments] = await db.query(repaymentQuery, [advanceId]);
-    
+
     return { ...rows[0], repayments };
   },
 
@@ -381,7 +389,7 @@ const EmployeeModel = {
    */
   addAdvanceRepayment: async (repaymentData) => {
     const { advance_id, employee_id, amount, date, notes, created_by } = repaymentData;
-    
+
     // Start transaction
     const connection = await db.getConnection();
     try {
@@ -456,6 +464,147 @@ const EmployeeModel = {
     `;
     const [rows] = await db.query(query, [employeeId]);
     return rows[0] || { pending_amount: 0, total_remaining_balance: 0, paid_amount: 0, active_advances: 0 };
+  },
+
+  /**
+   * Simple repayment - just employee_id and amount
+   * Automatically deducts from oldest pending advances first (FIFO)
+   * @param {object} repaymentData - { employee_id, amount, date, notes, created_by }
+   * @returns {object} Result with repayment details
+   */
+  addSimpleRepayment: async (repaymentData) => {
+    const { employee_id, amount, date, notes, created_by } = repaymentData;
+
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Get all pending/partial advances for this employee (oldest first)
+      const [advances] = await connection.query(`
+        SELECT id, remaining_balance 
+        FROM employee_advances 
+        WHERE employee_id = ? AND status IN ('PENDING', 'PARTIAL') AND remaining_balance > 0
+        ORDER BY date ASC, id ASC
+      `, [employee_id]);
+
+      let remainingAmount = parseFloat(amount);
+      const affectedAdvances = [];
+
+      // Deduct from advances (FIFO - oldest first)
+      for (const advance of advances) {
+        if (remainingAmount <= 0) break;
+
+        const deductAmount = Math.min(remainingAmount, parseFloat(advance.remaining_balance));
+        const newBalance = parseFloat(advance.remaining_balance) - deductAmount;
+        const newStatus = newBalance <= 0 ? 'PAID' : 'PARTIAL';
+
+        // Update this advance
+        await connection.query(`
+          UPDATE employee_advances 
+          SET remaining_balance = ?, status = ?, updated_at = NOW()
+          WHERE id = ?
+        `, [newBalance, newStatus, advance.id]);
+
+        // Record repayment for this advance
+        await connection.query(`
+          INSERT INTO employee_advance_repayments (advance_id, employee_id, amount, date, notes, created_by)
+          VALUES (?, ?, ?, ?, ?, ?)
+        `, [advance.id, employee_id, deductAmount, date, notes, created_by]);
+
+        affectedAdvances.push({ advance_id: advance.id, deducted: deductAmount });
+        remainingAmount -= deductAmount;
+      }
+
+      await connection.commit();
+
+      return {
+        repayment_id: Date.now(), // Just for reference
+        total_deducted: parseFloat(amount),
+        affected_advances: affectedAdvances
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  /**
+   * Get employee advance statement (bank statement style)
+   * Shows all advances and repayments in date order with running balance
+   * @param {number} employeeId - Employee ID
+   * @returns {object} Statement with transactions and totals
+   */
+  getEmployeeAdvanceStatement: async (employeeId) => {
+    // Get all advances
+    const [advances] = await db.query(`
+      SELECT 
+        'ADVANCE' as type,
+        id,
+        date,
+        amount,
+        reason as description,
+        created_at
+      FROM employee_advances
+      WHERE employee_id = ?
+    `, [employeeId]);
+
+    // Get all repayments
+    const [repayments] = await db.query(`
+      SELECT 
+        'REPAYMENT' as type,
+        id,
+        date,
+        amount,
+        notes as description,
+        created_at
+      FROM employee_advance_repayments
+      WHERE employee_id = ?
+    `, [employeeId]);
+
+    // Combine and sort by date
+    const allTransactions = [...advances, ...repayments];
+    allTransactions.sort((a, b) => {
+      const dateA = new Date(a.date);
+      const dateB = new Date(b.date);
+      if (dateA.getTime() === dateB.getTime()) {
+        return new Date(a.created_at) - new Date(b.created_at);
+      }
+      return dateA - dateB;
+    });
+
+    // Calculate running balance
+    let runningBalance = 0;
+    let totalAdvance = 0;
+    let totalRepaid = 0;
+
+    const transactions = allTransactions.map(t => {
+      const amount = parseFloat(t.amount);
+      if (t.type === 'ADVANCE') {
+        runningBalance += amount;
+        totalAdvance += amount;
+      } else {
+        runningBalance -= amount;
+        totalRepaid += amount;
+      }
+
+      return {
+        type: t.type,
+        date: t.date,
+        description: t.description || (t.type === 'ADVANCE' ? 'Advance taken' : 'Repayment'),
+        advance: t.type === 'ADVANCE' ? amount : 0,
+        repayment: t.type === 'REPAYMENT' ? amount : 0,
+        balance: runningBalance
+      };
+    });
+
+    return {
+      transactions,
+      total_advance: totalAdvance,
+      total_repaid: totalRepaid,
+      current_balance: runningBalance
+    };
   }
 };
 

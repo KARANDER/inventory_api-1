@@ -156,19 +156,20 @@ const employeeAdvanceController = {
   },
 
   /**
-   * Add repayment for an advance
+   * Add repayment for an employee (simple - just employee_id and amount)
+   * Automatically deducts from oldest pending advances first
    * POST: /employees/advances/addRepayment
    */
   addRepayment: async (req, res) => {
     try {
-      const { advance_id, amount, date, notes } = req.body;
+      const { employee_id, amount, date, notes } = req.body;
       const created_by = req.user.id;
 
       // Validation
-      if (!advance_id || !amount || !date) {
+      if (!employee_id || !amount || !date) {
         return res.status(400).json({
           success: false,
-          message: 'advance_id, amount, and date are required.'
+          message: 'employee_id, amount, and date are required.'
         });
       }
 
@@ -179,60 +180,64 @@ const employeeAdvanceController = {
         });
       }
 
-      // Get advance details to check remaining balance
-      const advance = await EmployeeModel.getAdvanceDetails(advance_id);
-
-      if (!advance) {
+      // Check if employee exists
+      const employee = await EmployeeModel.getEmployeeById(employee_id);
+      if (!employee) {
         return res.status(404).json({
           success: false,
-          message: 'Advance not found.'
+          message: 'Employee not found.'
         });
       }
 
-      if (advance.remaining_balance <= 0) {
+      // Get employee's total advance balance
+      const summary = await EmployeeModel.getEmployeeAdvanceSummary(employee_id);
+
+      if (summary.total_remaining_balance <= 0) {
         return res.status(400).json({
           success: false,
-          message: 'This advance has already been fully repaid.'
+          message: 'This employee has no pending advances.'
         });
       }
 
-      if (amount > advance.remaining_balance) {
+      if (amount > summary.total_remaining_balance) {
         return res.status(400).json({
           success: false,
-          message: `Repayment amount cannot exceed remaining balance of ₹${advance.remaining_balance}`,
-          remaining_balance: advance.remaining_balance
+          message: `Repayment amount cannot exceed total advance balance of ₹${summary.total_remaining_balance}`,
+          total_advance_balance: summary.total_remaining_balance
         });
       }
 
-      // Add repayment
+      // Add repayment using simple method
       const repaymentData = {
-        advance_id,
-        employee_id: advance.employee_id,
+        employee_id,
         amount: parseFloat(amount),
         date,
         notes: notes || null,
         created_by
       };
 
-      const newRepayment = await EmployeeModel.addAdvanceRepayment(repaymentData);
+      const result = await EmployeeModel.addSimpleRepayment(repaymentData);
 
       // Log activity
       await logUserActivity(req, {
         model_name: 'employee_advance_repayments',
         action_type: 'CREATE',
-        record_id: newRepayment.id,
-        description: `Added repayment of ₹${amount} for advance ID: ${advance_id} - Employee: ${advance.employee_name}`
+        record_id: result.repayment_id,
+        description: `Added repayment of ₹${amount} for employee: ${employee.name}`
       });
 
-      // Get updated advance details
-      const updatedAdvance = await EmployeeModel.getAdvanceDetails(advance_id);
+      // Get updated summary
+      const updatedSummary = await EmployeeModel.getEmployeeAdvanceSummary(employee_id);
 
       res.status(201).json({
         success: true,
         message: 'Repayment added successfully',
         data: {
-          repayment: newRepayment,
-          updated_advance: updatedAdvance
+          employee_id,
+          employee_name: employee.name,
+          repayment_amount: parseFloat(amount),
+          previous_balance: summary.total_remaining_balance,
+          new_balance: updatedSummary.total_remaining_balance
         }
       });
     } catch (error) {
@@ -292,7 +297,8 @@ const employeeAdvanceController = {
   },
 
   /**
-   * Get advance summary for an employee
+   * Get advance statement for an employee (bank statement style)
+   * Shows all advances and repayments in date order with running balance
    * POST: /employees/advances/summary
    */
   getAdvanceSummary: async (req, res) => {
@@ -314,14 +320,17 @@ const employeeAdvanceController = {
         });
       }
 
-      const summary = await EmployeeModel.getEmployeeAdvanceSummary(employee_id);
+      const statement = await EmployeeModel.getEmployeeAdvanceStatement(employee_id);
 
       res.status(200).json({
         success: true,
         data: {
           employee_id,
           employee_name: employee.name,
-          ...summary
+          statement: statement.transactions,
+          total_advance: statement.total_advance,
+          total_repaid: statement.total_repaid,
+          current_balance: statement.current_balance
         }
       });
     } catch (error) {
