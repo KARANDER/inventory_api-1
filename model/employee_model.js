@@ -288,6 +288,174 @@ const EmployeeModel = {
     `;
     const [result] = await db.query(query, [employeeId]);
     return result.affectedRows;
+  },
+
+  // --- NEW ADVANCE PAYMENT SYSTEM (Independent from Salary) ---
+
+  /**
+   * Creates a new advance payment for an employee
+   * @param {object} advanceData - { employee_id, amount, reason, date, created_by }
+   * @returns {object} The created advance record
+   */
+  createAdvancePayment: async (advanceData) => {
+    const { employee_id, amount, reason, date, created_by } = advanceData;
+    const query = `
+      INSERT INTO employee_advances (employee_id, amount, remaining_balance, reason, date, status, created_by)
+      VALUES (?, ?, ?, ?, ?, 'PENDING', ?)
+    `;
+    const [result] = await db.query(query, [employee_id, amount, amount, reason, date, created_by]);
+    return { id: result.insertId, ...advanceData, remaining_balance: amount, status: 'PENDING' };
+  },
+
+  /**
+   * Get all advances for an employee
+   * @param {number} employeeId - Employee ID
+   * @returns {array} List of all advances
+   */
+  getEmployeeAdvances: async (employeeId) => {
+    const query = `
+      SELECT 
+        ea.id,
+        ea.employee_id,
+        ea.amount,
+        ea.remaining_balance,
+        ea.reason,
+        ea.date,
+        ea.status,
+        ea.created_at,
+        ea.updated_at,
+        COUNT(ear.id) as repayment_count,
+        COALESCE(SUM(ear.amount), 0) as total_repaid
+      FROM employee_advances ea
+      LEFT JOIN employee_advance_repayments ear ON ea.id = ear.advance_id
+      WHERE ea.employee_id = ?
+      GROUP BY ea.id
+      ORDER BY ea.date DESC
+    `;
+    const [rows] = await db.query(query, [employeeId]);
+    return rows;
+  },
+
+  /**
+   * Get advance details with repayment history
+   * @param {number} advanceId - Advance ID
+   * @returns {object} Advance details with repayments
+   */
+  getAdvanceDetails: async (advanceId) => {
+    const query = `
+      SELECT 
+        ea.id,
+        ea.employee_id,
+        ea.amount,
+        ea.remaining_balance,
+        ea.reason,
+        ea.date,
+        ea.status,
+        ea.created_at,
+        e.name as employee_name,
+        e.mobile as employee_mobile
+      FROM employee_advances ea
+      LEFT JOIN employees e ON ea.employee_id = e.id
+      WHERE ea.id = ?
+    `;
+    const [rows] = await db.query(query, [advanceId]);
+    
+    if (rows.length === 0) return null;
+
+    // Get repayment history
+    const repaymentQuery = `
+      SELECT id, amount, date, notes, created_at
+      FROM employee_advance_repayments
+      WHERE advance_id = ?
+      ORDER BY date DESC
+    `;
+    const [repayments] = await db.query(repaymentQuery, [advanceId]);
+    
+    return { ...rows[0], repayments };
+  },
+
+  /**
+   * Add repayment for an advance
+   * @param {object} repaymentData - { advance_id, employee_id, amount, date, notes, created_by }
+   * @returns {object} The created repayment record
+   */
+  addAdvanceRepayment: async (repaymentData) => {
+    const { advance_id, employee_id, amount, date, notes, created_by } = repaymentData;
+    
+    // Start transaction
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Insert repayment
+      const repaymentQuery = `
+        INSERT INTO employee_advance_repayments (advance_id, employee_id, amount, date, notes, created_by)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `;
+      const [result] = await connection.query(repaymentQuery, [advance_id, employee_id, amount, date, notes, created_by]);
+
+      // Update advance remaining balance and status
+      const updateQuery = `
+        UPDATE employee_advances
+        SET remaining_balance = remaining_balance - ?,
+            status = CASE 
+              WHEN (remaining_balance - ?) <= 0 THEN 'PAID'
+              WHEN (remaining_balance - ?) < amount THEN 'PARTIAL'
+              ELSE 'PARTIAL'
+            END,
+            updated_at = NOW()
+        WHERE id = ?
+      `;
+      await connection.query(updateQuery, [amount, amount, amount, advance_id]);
+
+      await connection.commit();
+      return { id: result.insertId, ...repaymentData };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      await connection.release();
+    }
+  },
+
+  /**
+   * Get repayment history for an advance
+   * @param {number} advanceId - Advance ID
+   * @returns {array} List of repayments
+   */
+  getAdvanceRepayments: async (advanceId) => {
+    const query = `
+      SELECT 
+        id,
+        amount,
+        date,
+        notes,
+        created_at
+      FROM employee_advance_repayments
+      WHERE advance_id = ?
+      ORDER BY date DESC
+    `;
+    const [rows] = await db.query(query, [advanceId]);
+    return rows;
+  },
+
+  /**
+   * Get total pending advances for an employee
+   * @param {number} employeeId - Employee ID
+   * @returns {object} Summary of advances
+   */
+  getEmployeeAdvanceSummary: async (employeeId) => {
+    const query = `
+      SELECT 
+        COALESCE(SUM(CASE WHEN status = 'PENDING' THEN amount ELSE 0 END), 0) as pending_amount,
+        COALESCE(SUM(remaining_balance), 0) as total_remaining_balance,
+        COALESCE(SUM(CASE WHEN status = 'PAID' THEN amount ELSE 0 END), 0) as paid_amount,
+        COUNT(CASE WHEN status IN ('PENDING', 'PARTIAL') THEN 1 END) as active_advances
+      FROM employee_advances
+      WHERE employee_id = ?
+    `;
+    const [rows] = await db.query(query, [employeeId]);
+    return rows[0] || { pending_amount: 0, total_remaining_balance: 0, paid_amount: 0, active_advances: 0 };
   }
 };
 
