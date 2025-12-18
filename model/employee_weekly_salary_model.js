@@ -172,6 +172,7 @@ const EmployeeWeeklySalaryModel = {
 
             for (const emp of employeesData) {
                 const employee_id = emp.employee_id;
+                const employee_name = emp.employee_name || null;
                 const daily_salary = safeNum(emp.daily_salary);
 
                 // Safely parse all day values
@@ -201,12 +202,13 @@ const EmployeeWeeklySalaryModel = {
                 // Upsert query (INSERT or UPDATE if exists)
                 const query = `
                     INSERT INTO employee_weekly_salary (
-                        employee_id, week_start_date, week_end_date,
+                        employee_id, employee_name, week_start_date, week_end_date,
                         mon_days, mon_ot, tue_days, tue_ot, wed_days, wed_ot,
                         thu_days, thu_ot, fri_days, fri_ot, sat_days, sat_ot,
                         sun_days, sun_ot, total_days, total_ot, total_salary
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     ON DUPLICATE KEY UPDATE
+                        employee_name = VALUES(employee_name),
                         mon_days = VALUES(mon_days), mon_ot = VALUES(mon_ot),
                         tue_days = VALUES(tue_days), tue_ot = VALUES(tue_ot),
                         wed_days = VALUES(wed_days), wed_ot = VALUES(wed_ot),
@@ -220,7 +222,7 @@ const EmployeeWeeklySalaryModel = {
                 `;
 
                 const [result] = await connection.query(query, [
-                    employee_id, weekStart, weekEnd,
+                    employee_id, employee_name, weekStart, weekEnd,
                     mon_days, mon_ot, tue_days, tue_ot, wed_days, wed_ot,
                     thu_days, thu_ot, fri_days, fri_ot, sat_days, sat_ot,
                     sun_days, sun_ot, total_days, total_ot, total_salary
@@ -268,18 +270,20 @@ const EmployeeWeeklySalaryModel = {
     },
 
     /**
-     * Get salary data for a specific week
-     * @param {string} weekStartDate - Monday date of the week (YYYY-MM-DD)
+     * Get salary data for a specific week (past week)
+     * Queries directly from employee_weekly_salary to include deleted employees
+     * @param {string} weekStartDate - Saturday date of the week (YYYY-MM-DD)
      */
     getWeekData: async (weekStartDate) => {
         // Clean the date - extract just YYYY-MM-DD if timestamp is passed
         const cleanDate = weekStartDate.split('T')[0];
 
+        // Query directly from employee_weekly_salary to include deleted employees
         const query = `
             SELECT 
-                e.id AS employee_id,
-                e.name AS employee_name,
-                e.daily_salary,
+                ews.employee_id,
+                COALESCE(ews.employee_name, e.name) AS employee_name,
+                COALESCE(e.daily_salary, 0) AS daily_salary,
                 ews.id AS salary_record_id,
                 ews.week_start_date,
                 ews.week_end_date,
@@ -300,11 +304,10 @@ const EmployeeWeeklySalaryModel = {
                 ews.total_days,
                 ews.total_ot,
                 ews.total_salary
-            FROM employees e
-            LEFT JOIN employee_weekly_salary ews 
-                ON e.id = ews.employee_id 
-                AND ews.week_start_date = ?
-            ORDER BY e.name ASC
+            FROM employee_weekly_salary ews
+            LEFT JOIN employees e ON ews.employee_id = e.id
+            WHERE ews.week_start_date = ?
+            ORDER BY COALESCE(ews.employee_name, e.name) ASC
         `;
 
         const [rows] = await db.query(query, [cleanDate]);
