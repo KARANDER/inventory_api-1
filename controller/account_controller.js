@@ -22,8 +22,19 @@ const accountController = {
 
   getAllAccounts: async (req, res) => {
     try {
-      const accounts = await Account.findAll();
-      res.status(200).json({ success: true, data: accounts });
+      const { page = 1, limit = 10, search = '' } = req.body;
+
+      const result = await Account.findAllPaginated({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search: search || ''
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
@@ -36,18 +47,18 @@ const accountController = {
       if (!id) {
         return res.status(400).json({ success: false, message: 'Account ID is required in the body.' });
       }
-      
+
       // Fetch old record before updating
       const oldRecord = await Account.findById(id);
       if (!oldRecord) {
         return res.status(404).json({ success: false, message: 'Account not found' });
       }
-      
+
       const affectedRows = await Account.update(id, accountData);
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Account not found' });
       }
-      
+
       // Compare old vs new values and log changes
       const changes = compareChanges(oldRecord, accountData);
       await logUserActivity(req, {

@@ -17,48 +17,48 @@ const Contact = {
 
       // 2. Based on the type, insert into the correct details table
       if (type === 'Customer') {
-    // Add the new fields here
-    const { 
-        credit_period, billing_address, delivery_address, gstin, pan, 
-        place_of_supply, reverse_charge, type_of_registration, total_amount,
-        // ADD these new fields
-        notes, payment, date, order_follow_up, no_1,no_2 
-    } = baseData.details;
+        // Add the new fields here
+        const {
+          credit_period, billing_address, delivery_address, gstin, pan,
+          place_of_supply, reverse_charge, type_of_registration, total_amount,
+          // ADD these new fields
+          notes, payment, date, order_follow_up, no_1, no_2
+        } = baseData.details;
 
-    // Update the INSERT query
-    const customerQuery = `INSERT INTO customer_details 
+        // Update the INSERT query
+        const customerQuery = `INSERT INTO customer_details 
         (contact_id, credit_period, billing_address, delivery_address, gstin, pan, 
          place_of_supply, reverse_charge, type_of_registration, total_amount,
          notes, payment, date, order_follow_up,no_1,no_2) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-    // Add the new values to the array
-    await connection.query(customerQuery, [
-        contactId, credit_period, billing_address, delivery_address, gstin, pan, 
-        place_of_supply, reverse_charge, type_of_registration, total_amount,
-        notes, payment, date, order_follow_up,no_1,no_2
-    ]);
-}
- else if (type === 'Supplier') {
-    // Add the new fields here
-    const { 
-        credit_limit, division, due_date, payment_status, note, total_amount,
-        // ADD these new fields
-        notes, payment, date, order_follow_up 
-    } = baseData.details;
+        // Add the new values to the array
+        await connection.query(customerQuery, [
+          contactId, credit_period, billing_address, delivery_address, gstin, pan,
+          place_of_supply, reverse_charge, type_of_registration, total_amount,
+          notes, payment, date, order_follow_up, no_1, no_2
+        ]);
+      }
+      else if (type === 'Supplier') {
+        // Add the new fields here
+        const {
+          credit_limit, division, due_date, payment_status, note, total_amount,
+          // ADD these new fields
+          notes, payment, date, order_follow_up
+        } = baseData.details;
 
-    // Update the INSERT query
-    const supplierQuery = `INSERT INTO supplier_details 
+        // Update the INSERT query
+        const supplierQuery = `INSERT INTO supplier_details 
         (contact_id, credit_limit, division, due_date, payment_status, note, total_amount,
          notes, payment, date, order_follow_up) 
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-    // Add the new values to the array
-    await connection.query(supplierQuery, [
-        contactId, credit_limit, division, due_date, payment_status, note, total_amount,
-        notes, payment, date, order_follow_up
-    ]);
-}
+        // Add the new values to the array
+        await connection.query(supplierQuery, [
+          contactId, credit_limit, division, due_date, payment_status, note, total_amount,
+          notes, payment, date, order_follow_up
+        ]);
+      }
 
       await connection.commit();
       return { id: contactId, ...contactData };
@@ -142,7 +142,7 @@ const Contact = {
     `;
     const [rows] = await db.query(query);
     return rows;
-},
+  },
 
 
   update: async (id, updateData) => {
@@ -160,15 +160,15 @@ const Contact = {
         const values = [];
         for (const [key, value] of Object.entries(baseData)) {
           if (value !== undefined && key !== 'id' && key !== 'updated_by') { // Assuming updated_by is managed separately or not in baseData
-             fields.push(`${key} = ?`);
-             values.push(value);
+            fields.push(`${key} = ?`);
+            values.push(value);
           }
         }
-        
+
         if (fields.length > 0) {
-            values.push(id);
-            const updateContactQuery = `UPDATE contacts SET ${fields.join(', ')} WHERE id = ?`;
-            await connection.query(updateContactQuery, values);
+          values.push(id);
+          const updateContactQuery = `UPDATE contacts SET ${fields.join(', ')} WHERE id = ?`;
+          await connection.query(updateContactQuery, values);
         }
       }
 
@@ -200,7 +200,7 @@ const Contact = {
       // Return the updated contact row with joined details (optional)
       // UPDATED query to select total_amount
       const [rows] = await connection.query(
-    `SELECT c.*, cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
+        `SELECT c.*, cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
      cd.place_of_supply, cd.reverse_charge, cd.type_of_registration, cd.total_amount,
      cd.notes, cd.payment, cd.date, cd.order_follow_up,cd.no_1,cd.no_2,
      sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note
@@ -208,7 +208,7 @@ const Contact = {
      LEFT JOIN customer_details cd ON c.id = cd.contact_id
      LEFT JOIN supplier_details sd ON c.id = sd.contact_id
      WHERE c.id = ?`, [id]
-);
+      );
 
       return rows[0];
     } catch (error) {
@@ -247,7 +247,117 @@ const Contact = {
   findAllContactCodes: async () => {
     const [rows] = await db.query('SELECT DISTINCT code FROM contacts WHERE code IS NOT NULL ORDER BY code');
     return rows;
-},
+  },
+
+  // Paginated search with multi-term support and type filter
+  findAllPaginated: async ({ page = 1, limit = 10, search = '', type = '' }) => {
+    const offset = (page - 1) * limit;
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    // Type filter
+    if (type && type.trim()) {
+      whereConditions.push('c.type = ?');
+      queryParams.push(type.trim());
+    }
+
+    // Multi-term search - split by space, must match ALL terms (AND logic)
+    // Each term can be in ANY field, but all terms must be present
+    if (search && search.trim()) {
+      const terms = search.trim().split(/\s+/).filter(t => t.length > 0);
+      if (terms.length > 0) {
+        const searchFields = [
+          'c.contact_name', 'c.code', 'c.email', 'c.address',
+          'cd.billing_address', 'cd.delivery_address', 'cd.gstin', 'cd.pan',
+          'cd.place_of_supply', 'cd.notes', 'cd.no_1', 'cd.no_2',
+          'sd.division', 'sd.note'
+        ];
+
+        // For each term: (field1 LIKE term OR field2 LIKE term OR ...)
+        // Then join all terms with AND
+        const termConditions = terms.map(term => {
+          const fieldConditions = searchFields.map(field => {
+            queryParams.push(`%${term}%`);
+            return `${field} LIKE ?`;
+          }).join(' OR ');
+          return `(${fieldConditions})`;
+        });
+
+        // AND logic - must match ALL terms
+        whereConditions.push(`(${termConditions.join(' AND ')})`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Count query
+    const countQuery = `
+      SELECT COUNT(DISTINCT c.id) as total
+      FROM contacts c
+      LEFT JOIN customer_details cd ON c.id = cd.contact_id
+      LEFT JOIN supplier_details sd ON c.id = sd.contact_id
+      ${whereClause}
+    `;
+
+    const [countResult] = await db.query(countQuery, queryParams);
+    const total = countResult[0].total;
+
+    // Data query
+    const dataQuery = `
+      SELECT
+        c.*,
+        cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
+        cd.place_of_supply, cd.reverse_charge, cd.type_of_registration, cd.total_amount,
+        cd.notes, cd.payment, cd.date, cd.order_follow_up, cd.no_1, cd.no_2,
+        sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note,
+        COALESCE(
+          (
+            SELECT DATEDIFF(CURDATE(), i.invoice_date)
+            FROM invoices i
+            WHERE i.customer_id = c.code
+            AND i.remaining_amount > 0
+            ORDER BY i.created_at DESC, i.id DESC
+            LIMIT 1
+          ),
+          0
+        ) AS overdue_days,
+        (
+          SELECT i.invoice_number
+          FROM invoices i
+          WHERE i.customer_id = c.code
+          AND i.remaining_amount > 0
+          ORDER BY i.created_at DESC, i.id DESC
+          LIMIT 1
+        ) AS invoice_number,
+        (
+          SELECT i.remaining_amount
+          FROM invoices i
+          WHERE i.customer_id = c.code
+          AND i.remaining_amount > 0
+          ORDER BY i.created_at DESC, i.id DESC
+          LIMIT 1
+        ) AS remaining_amount
+      FROM contacts c
+      LEFT JOIN customer_details cd ON c.id = cd.contact_id
+      LEFT JOIN supplier_details sd ON c.id = sd.contact_id
+      ${whereClause}
+      ORDER BY c.id DESC
+      LIMIT ? OFFSET ?
+    `;
+
+    const [rows] = await db.query(dataQuery, [...queryParams, limit, offset]);
+
+    return {
+      data: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  },
 
 }
 module.exports = Contact;

@@ -3,10 +3,10 @@ const db = require('../config/db');
 const SalesOrder = {
   create: async (orderData) => {
     const fields = [
-      'order_number', 'order_date', 'customer_id', 'item_code', 'finish', 
-      'stock_qty', 'scrap', 'labour', 'kg_dzn', 'pcs_box', 'box_ctn', 
-      'pcs_ctn', 'kg_box', 'qty_ctn', 'total_kg', 'quantity_pcs', 
-      'order_stock', 'manufacturer_name', 'po_vr', 'note', 'invoice_status', 
+      'order_number', 'order_date', 'customer_id', 'item_code', 'finish',
+      'stock_qty', 'scrap', 'labour', 'kg_dzn', 'pcs_box', 'box_ctn',
+      'pcs_ctn', 'kg_box', 'qty_ctn', 'total_kg', 'quantity_pcs',
+      'order_stock', 'manufacturer_name', 'po_vr', 'note', 'invoice_status',
       'created_by', 'customer_code', 'customer_name', 'rate_pcs', 'rate_kz'
     ];
     const placeholders = fields.map(() => '?').join(', ');
@@ -129,6 +129,69 @@ const SalesOrder = {
     const query = 'SELECT stock_quantity FROM master_items WHERE item_code = ?';
     const [rows] = await db.query(query, [itemCode]);
     return rows[0];
+  },
+
+  // Paginated search with multi-term support
+  findAllPaginated: async ({ page = 1, limit = 10, search = '' }) => {
+    const offset = (page - 1) * limit;
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    // Multi-term search - split by space, must match ALL terms (AND logic)
+    if (search && search.trim()) {
+      const terms = search.trim().split(/\s+/).filter(t => t.length > 0);
+      if (terms.length > 0) {
+        const searchFields = [
+          'so.order_number', 'so.customer_id', 'so.item_code', 'so.finish',
+          'so.manufacturer_name', 'so.po_vr', 'so.note', 'so.customer_code',
+          'so.customer_name', 'c.contact_name'
+        ];
+
+        const termConditions = terms.map(term => {
+          const fieldConditions = searchFields.map(field => {
+            queryParams.push(`%${term}%`);
+            return `${field} LIKE ?`;
+          }).join(' OR ');
+          return `(${fieldConditions})`;
+        });
+
+        whereConditions.push(`(${termConditions.join(' AND ')})`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Count query
+    const countQuery = `
+      SELECT COUNT(*) as total 
+      FROM sales_orders so
+      LEFT JOIN contacts c ON so.customer_id = c.id
+      ${whereClause}
+    `;
+    const [countResult] = await db.query(countQuery, queryParams);
+    const total = countResult[0].total;
+
+    // Data query
+    const dataQuery = `
+      SELECT so.*, c.contact_name as customer_name 
+      FROM sales_orders so
+      LEFT JOIN contacts c ON so.customer_id = c.id
+      ${whereClause}
+      ORDER BY so.id DESC
+      LIMIT ? OFFSET ?
+    `;
+    const [rows] = await db.query(dataQuery, [...queryParams, limit, offset]);
+
+    return {
+      data: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
 };
 

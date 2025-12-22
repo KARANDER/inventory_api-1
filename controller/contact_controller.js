@@ -6,7 +6,7 @@ const contactController = {
   createContact: async (req, res) => {
     try {
       const created_by = req.user.id;
-      
+
       // The file path will be available in req.file.path
       const image_url = req.file ? req.file.path : null;
 
@@ -31,11 +31,23 @@ const contactController = {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   },
-  // ... (getAllContacts remains the same)
+  // Paginated getAllContacts with multi-term search and type filter
   getAllContacts: async (req, res) => {
     try {
-      const contacts = await Contact.findAll();
-      res.status(200).json({ success: true, data: contacts });
+      const { page = 1, limit = 10, search = '', type = '' } = req.body;
+
+      const result = await Contact.findAllPaginated({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search: search || '',
+        type: type || ''
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
@@ -67,7 +79,7 @@ const contactController = {
       // Note: For contacts, we compare the main fields (excluding nested details for simplicity)
       const { details, updated_by, ...mainFields } = req.body;
       const changes = compareChanges(oldRecord, mainFields);
-      
+
       await logUserActivity(req, {
         model_name: 'contacts',
         action_type: 'UPDATE',
@@ -105,19 +117,19 @@ const contactController = {
   },
   getAllContactCodes: async (req, res) => {
     try {
-        const contactCodes = await Contact.findAllContactCodes();
-        res.status(200).json({
-            success: true,
-            data: contactCodes.map(row => row.code)
-        });
+      const contactCodes = await Contact.findAllContactCodes();
+      res.status(200).json({
+        success: true,
+        data: contactCodes.map(row => row.code)
+      });
     } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'Server Error',
-            error: error.message
-        });
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
+      });
     }
-},
+  },
 
 };
 

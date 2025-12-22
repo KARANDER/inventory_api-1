@@ -20,25 +20,31 @@ const masterController = {
   },
 
   getAllItems: async (req, res) => {
-  try {
-    // Fetch data from both tables in parallel
-    const [items, cartons] = await Promise.all([
-      MasterItem.findAll(),
-      MasterItem.findAllCorton()
-    ]);
-    
-    // Combine them in the response JSON
-    res.status(200).json({ 
-      success: true, 
-      data: {
-        masterItems: items,
-        cartonInventory: cartons
-      } 
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-  }
-},
+    try {
+      const { page = 1, limit = 10, search = '' } = req.body;
+
+      // Fetch paginated master items and all cartons
+      const [result, cartons] = await Promise.all([
+        MasterItem.findAllPaginated({
+          page: parseInt(page),
+          limit: parseInt(limit),
+          search: search || ''
+        }),
+        MasterItem.findAllCorton()
+      ]);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          masterItems: result.data,
+          cartonInventory: cartons
+        },
+        pagination: result.pagination
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
 
   updateItem: async (req, res) => {
     try {
@@ -47,18 +53,18 @@ const masterController = {
       if (!id) {
         return res.status(400).json({ success: false, message: 'Item ID is required in the body.' });
       }
-      
+
       // Fetch old record before updating
       const oldRecord = await MasterItem.findById(id);
       if (!oldRecord) {
         return res.status(404).json({ success: false, message: 'Item not found' });
       }
-      
+
       const affectedRows = await MasterItem.update(id, itemData);
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Item not found' });
       }
-      
+
       // Compare old vs new values and log changes
       const changes = compareChanges(oldRecord, itemData);
       await logUserActivity(req, {
@@ -78,7 +84,7 @@ const masterController = {
     try {
       // Get ID from the request body
       const { id } = req.body;
-       if (!id) {
+      if (!id) {
         return res.status(400).json({ success: false, message: 'Item ID is required in the body.' });
       }
       const affectedRows = await MasterItem.delete(id);
@@ -98,11 +104,11 @@ const masterController = {
   },
   getItemCodes: async (req, res) => {
     try {
-        const itemCodes = await MasterItem.findAllItemCodes();
-        res.status(200).json({ success: true, data: itemCodes });
+      const itemCodes = await MasterItem.findAllItemCodes();
+      res.status(200).json({ success: true, data: itemCodes });
     } catch (error) {
-        res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
-},  
+  },
 };
 module.exports = masterController;

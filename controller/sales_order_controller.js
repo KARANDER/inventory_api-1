@@ -32,8 +32,19 @@ const salesOrderController = {
 
   getAllOrders: async (req, res) => {
     try {
-      const orders = await SalesOrder.findAll();
-      res.status(200).json({ success: true, data: orders });
+      const { page = 1, limit = 10, search = '' } = req.body;
+
+      const result = await SalesOrder.findAllPaginated({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search: search || ''
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }

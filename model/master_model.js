@@ -36,7 +36,51 @@ const MasterItem = {
   findAllItemCodes: async () => {
     const [rows] = await db.query('SELECT item_code FROM master_items');
     return rows.map(row => row.item_code);
-},
+  },
+
+  // Paginated search with multi-term support
+  findAllPaginated: async ({ page = 1, limit = 10, search = '' }) => {
+    const offset = (page - 1) * limit;
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    if (search && search.trim()) {
+      const terms = search.trim().split(/\s+/).filter(t => t.length > 0);
+      if (terms.length > 0) {
+        const searchFields = ['item_code', 'description', 'kg_dz'];
+
+        const termConditions = terms.map(term => {
+          const fieldConditions = searchFields.map(field => {
+            queryParams.push(`%${term}%`);
+            return `${field} LIKE ?`;
+          }).join(' OR ');
+          return `(${fieldConditions})`;
+        });
+
+        whereConditions.push(`(${termConditions.join(' AND ')})`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    const countQuery = `SELECT COUNT(*) as total FROM master_items ${whereClause}`;
+    const [countResult] = await db.query(countQuery, queryParams);
+    const total = countResult[0].total;
+
+    const dataQuery = `SELECT * FROM master_items ${whereClause} ORDER BY id DESC LIMIT ? OFFSET ?`;
+    const [rows] = await db.query(dataQuery, [...queryParams, limit, offset]);
+
+    return {
+      data: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
+  },
 
 };
 module.exports = MasterItem;

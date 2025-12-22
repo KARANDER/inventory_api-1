@@ -27,48 +27,59 @@ const paymentController = {
   },
   getAllPayments: async (req, res) => {
     try {
-      const payments = await Payment.findAll();
-      res.status(200).json({ success: true, data: payments });
+      const { page = 1, limit = 10, search = '' } = req.body;
+
+      const result = await Payment.findAllPaginated({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search: search || ''
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   },
   updatePayment: async (req, res) => {
-  try {
-    const paymentId = req.body.id;
-    const user_id = req.user.id;
-    const image_url = req.file ? req.file.path : null;
-    const updateData = { ...req.body, user_id };
-    if (image_url) updateData.image_url = image_url;
+    try {
+      const paymentId = req.body.id;
+      const user_id = req.user.id;
+      const image_url = req.file ? req.file.path : null;
+      const updateData = { ...req.body, user_id };
+      if (image_url) updateData.image_url = image_url;
 
-    const updatedPayment = await Payment.update(paymentId, updateData);
-    await logUserActivity(req, {
-      model_name: 'payments',
-      action_type: 'UPDATE',
-      record_id: paymentId,
-      description: 'Updated payment'
-    });
-    res.status(200).json({ success: true, message: "Payment updated successfully.", data: updatedPayment });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-  }
-},
+      const updatedPayment = await Payment.update(paymentId, updateData);
+      await logUserActivity(req, {
+        model_name: 'payments',
+        action_type: 'UPDATE',
+        record_id: paymentId,
+        description: 'Updated payment'
+      });
+      res.status(200).json({ success: true, message: "Payment updated successfully.", data: updatedPayment });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
 
-deletePayment: async (req, res) => {
-  try {
-    const paymentId = req.body.id;
-    await Payment.delete(paymentId);
-    await logUserActivity(req, {
-      model_name: 'payments',
-      action_type: 'DELETE',
-      record_id: paymentId,
-      description: 'Deleted payment'
-    });
-    res.status(200).json({ success: true, message: "Payment deleted successfully." });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-  }
-},
+  deletePayment: async (req, res) => {
+    try {
+      const paymentId = req.body.id;
+      await Payment.delete(paymentId);
+      await logUserActivity(req, {
+        model_name: 'payments',
+        action_type: 'DELETE',
+        record_id: paymentId,
+        description: 'Deleted payment'
+      });
+      res.status(200).json({ success: true, message: "Payment deleted successfully." });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
 
 };
 module.exports = paymentController;
