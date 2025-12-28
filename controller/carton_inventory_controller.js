@@ -34,23 +34,68 @@ const cartonInventoryController = {
     }
   },
   getCartonNames: async (req, res) => {
-  try {
-    const cartonNames = await CartonInventory.findAllCartonNames();
-    res.status(200).json({
-      success: true,
-      data: cartonNames
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server Error', 
-      error: error.message 
-    });
-  }
-},
+    try {
+      const cartonNames = await CartonInventory.findAllCartonNames();
+      res.status(200).json({
+        success: true,
+        data: cartonNames
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
+      });
+    }
+  },
 
+  updateCarton: async (req, res) => {
+    try {
+      const { id, carton_name, carton_quantity } = req.body;
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'Carton ID is required.' });
+      }
 
-  // You can add getAllCartons, updateCarton, etc. functions here later
+      const affectedRows = await CartonInventory.update(id, { carton_name, carton_quantity });
+      if (affectedRows === 0) {
+        return res.status(404).json({ success: false, message: 'Carton not found.' });
+      }
+
+      await logUserActivity(req, {
+        model_name: 'carton_inventory',
+        action_type: 'UPDATE',
+        record_id: id,
+        description: `Updated carton ${carton_name}`
+      });
+      res.status(200).json({ success: true, message: 'Carton updated successfully.' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  deleteCarton: async (req, res) => {
+    try {
+      const { id } = req.body;
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'Carton ID is required.' });
+      }
+
+      const affectedRows = await CartonInventory.delete(id);
+      if (affectedRows === 0) {
+        return res.status(404).json({ success: false, message: 'Carton not found.' });
+      }
+
+      await logUserActivity(req, {
+        model_name: 'carton_inventory',
+        action_type: 'DELETE',
+        record_id: id,
+        description: 'Deleted carton'
+      });
+      res.status(200).json({ success: true, message: 'Carton deleted successfully.' });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
 };
 
 module.exports = cartonInventoryController;

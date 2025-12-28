@@ -13,8 +13,7 @@ const permission = 'master_items'; // You might need to add this permission to y
 // Route to add a new carton
 router.post('/addCarton', checkPermission(permission), cartonInventoryController.addCarton);
 router.post('/getCartonNames', checkPermission(permission), cartonInventoryController.getCartonNames);
-
-
-// You can add other routes like getAll, update, delete here later
+router.post('/updateCarton', checkPermission(permission), cartonInventoryController.updateCarton);
+router.post('/deleteCarton', checkPermission(permission), cartonInventoryController.deleteCarton);
 
 module.exports = router;

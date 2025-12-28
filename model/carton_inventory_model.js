@@ -20,7 +20,23 @@ const CartonInventory = {
     return rows.map(row => row.carton_name);
   },
 
-  // You can add findAll, update, and delete functions here later
+  findById: async (id) => {
+    const [rows] = await db.query('SELECT * FROM carton_inventory WHERE id = ?', [id]);
+    return rows.length > 0 ? rows[0] : null;
+  },
+
+  update: async (id, cartonData) => {
+    const { carton_name, carton_quantity } = cartonData;
+    const query = 'UPDATE carton_inventory SET carton_name = ?, carton_quantity = ? WHERE id = ?';
+    const [result] = await db.query(query, [carton_name, carton_quantity, id]);
+    return result.affectedRows;
+  },
+
+  delete: async (id) => {
+    const query = 'DELETE FROM carton_inventory WHERE id = ?';
+    const [result] = await db.query(query, [id]);
+    return result.affectedRows;
+  },
 };
 
 module.exports = CartonInventory;
