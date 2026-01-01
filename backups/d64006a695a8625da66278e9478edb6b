@@ -1,0 +1,1867 @@
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Dec 18, 2025 at 05:28 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
+
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
+
+
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
+
+--
+-- Database: `inventory`
+--
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `accounts`
+--
+
+CREATE TABLE `accounts` (
+  `id` int(11) NOT NULL,
+  `account_name` varchar(255) NOT NULL,
+  `balance` decimal(15,2) NOT NULL DEFAULT 0.00,
+  `code` varchar(50) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `accounts`
+--
+
+INSERT INTO `accounts` (`id`, `account_name`, `balance`, `code`, `created_by`, `created_at`, `updated_at`) VALUES
+(5, 'NO_1', 1230.00, 'ICI-02', 18, '2025-10-23 20:50:38', '2025-11-30 21:06:48'),
+(7, 'NO_2', 0.00, 'ICI-03', 18, '2025-11-04 20:05:54', '2025-11-04 20:10:52');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `account_history`
+--
+
+CREATE TABLE `account_history` (
+  `id` int(11) NOT NULL,
+  `account_id` int(11) NOT NULL,
+  `transaction_type` enum('CREDIT','DEBIT') NOT NULL COMMENT 'CREDIT = Receipt (money added), DEBIT = Payment (money subtracted)',
+  `amount` decimal(15,2) NOT NULL,
+  `contact_id` int(11) DEFAULT NULL COMMENT 'ID from contacts table (customer or supplier)',
+  `contact_name` varchar(255) DEFAULT NULL COMMENT 'Name of customer/supplier for easy display',
+  `contact_type` varchar(50) DEFAULT NULL COMMENT 'Customer or Supplier',
+  `date` date NOT NULL,
+  `description` text DEFAULT NULL,
+  `reference` varchar(255) DEFAULT NULL,
+  `receipt_id` int(11) DEFAULT NULL COMMENT 'Link to receipts table if transaction is from receipt',
+  `payment_id` int(11) DEFAULT NULL COMMENT 'Link to payments table if transaction is from payment',
+  `balance_after` decimal(15,2) DEFAULT NULL COMMENT 'Account balance after this transaction',
+  `user_id` int(11) DEFAULT NULL COMMENT 'User who created the transaction',
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `carton_inventory`
+--
+
+CREATE TABLE `carton_inventory` (
+  `id` int(11) NOT NULL,
+  `carton_name` varchar(255) NOT NULL,
+  `carton_quantity` int(11) NOT NULL DEFAULT 0,
+  `created_by` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `carton_inventory`
+--
+
+INSERT INTO `carton_inventory` (`id`, `carton_name`, `carton_quantity`, `created_by`) VALUES
+(5, 'CTN', 198, 18);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `contacts`
+--
+
+CREATE TABLE `contacts` (
+  `id` int(11) NOT NULL,
+  `contact_name` varchar(255) NOT NULL,
+  `type` enum('Customer','Supplier','Other') NOT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `code` varchar(50) DEFAULT NULL,
+  `email` varchar(255) DEFAULT NULL,
+  `image_url` varchar(255) DEFAULT NULL,
+  `address` text DEFAULT NULL,
+  `updated_by` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `contacts`
+--
+
+INSERT INTO `contacts` (`id`, `contact_name`, `type`, `created_by`, `created_at`, `updated_at`, `code`, `email`, `image_url`, `address`, `updated_by`) VALUES
+(63, 'AKSH', 'Supplier', 18, '2025-12-14 10:04:11', '2025-12-14 10:04:11', 'AKSH', '', NULL, '', NULL),
+(64, 'KHUS', 'Supplier', 18, '2025-12-14 10:04:28', '2025-12-14 10:04:28', 'KHUS', '', NULL, '', NULL),
+(65, 'TISA', 'Supplier', 18, '2025-12-14 10:04:50', '2025-12-14 10:04:50', 'TISA', '', NULL, '', NULL),
+(66, 'SVBK', 'Customer', 18, '2025-12-14 10:08:37', '2025-12-14 10:08:37', 'SVBK', '', NULL, '', NULL),
+(67, 'NTHY', 'Customer', 18, '2025-12-14 10:08:48', '2025-12-14 10:08:48', 'NTHY', '', NULL, '', NULL),
+(68, 'DEEP', 'Supplier', 18, '2025-12-14 10:16:30', '2025-12-14 10:16:30', 'DEEP', '', NULL, '', NULL),
+(69, 'SHIV', 'Supplier', 18, '2025-12-14 11:57:09', '2025-12-14 11:57:09', 'SHIV', '', NULL, '', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `customer_details`
+--
+
+CREATE TABLE `customer_details` (
+  `id` int(11) NOT NULL,
+  `contact_id` int(11) NOT NULL,
+  `credit_period` varchar(50) DEFAULT NULL,
+  `billing_address` text DEFAULT NULL,
+  `delivery_address` text DEFAULT NULL,
+  `gstin` varchar(15) DEFAULT NULL,
+  `pan` varchar(10) DEFAULT NULL,
+  `place_of_supply` varchar(100) DEFAULT NULL,
+  `reverse_charge` varchar(10) DEFAULT NULL,
+  `type_of_registration` varchar(100) DEFAULT NULL,
+  `total_amount` decimal(12,2) DEFAULT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `payment` varchar(255) DEFAULT NULL,
+  `date` date DEFAULT NULL,
+  `order_follow_up` text DEFAULT NULL,
+  `no_1` decimal(10,2) DEFAULT NULL,
+  `no_2` decimal(10,2) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `customer_details`
+--
+
+INSERT INTO `customer_details` (`id`, `contact_id`, `credit_period`, `billing_address`, `delivery_address`, `gstin`, `pan`, `place_of_supply`, `reverse_charge`, `type_of_registration`, `total_amount`, `notes`, `payment`, `date`, `order_follow_up`, `no_1`, `no_2`) VALUES
+(15, 66, '', '', '', '', '', '', 'No', 'Regular', 27915.43, NULL, NULL, NULL, NULL, 1200.00, 452.00),
+(16, 67, '', '', '', '', '', '', 'No', 'Regular', 17604.13, NULL, NULL, NULL, NULL, 0.00, 17604.13);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employees`
+--
+
+CREATE TABLE `employees` (
+  `id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `age` int(11) DEFAULT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT NULL,
+  `mobile` varchar(20) NOT NULL,
+  `profile_photo` varchar(255) DEFAULT NULL,
+  `document_photos` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL,
+  `daily_salary` decimal(10,2) NOT NULL COMMENT 'Fixed pay for a standard 10-hour day',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `employees`
+--
+
+INSERT INTO `employees` (`id`, `name`, `age`, `gender`, `mobile`, `profile_photo`, `document_photos`, `daily_salary`, `created_at`) VALUES
+(9, 'RAJ ghaadiya', 25, 'Male', '9909099999', 'uploads/profile_photo-1765735941601.jpg', '[\"uploads/document_photos-1765706062201.jpeg\"]', 500.00, '2025-12-14 09:54:22'),
+(10, 'ASAD', 22, 'Female', '11111 11100', NULL, NULL, 350.00, '2025-12-14 09:57:44'),
+(11, 'DIPPAK', 23, 'Male', '9099999999', NULL, NULL, 400.00, '2025-12-14 09:59:09');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employee_advances`
+--
+
+CREATE TABLE `employee_advances` (
+  `id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `amount` decimal(15,2) NOT NULL COMMENT 'Original advance amount given',
+  `remaining_balance` decimal(15,2) NOT NULL COMMENT 'Amount still pending repayment',
+  `reason` varchar(255) DEFAULT NULL COMMENT 'Reason for advance (e.g., emergency, personal)',
+  `date` date NOT NULL COMMENT 'Date when advance was given',
+  `status` enum('PENDING','PARTIAL','PAID') DEFAULT 'PENDING' COMMENT 'PENDING=No repayment, PARTIAL=Some repaid, PAID=Fully repaid',
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `employee_advances`
+--
+
+INSERT INTO `employee_advances` (`id`, `employee_id`, `amount`, `remaining_balance`, `reason`, `date`, `status`, `created_by`, `created_at`, `updated_at`) VALUES
+(1, 10, 500.00, 150.00, 'xyz', '2025-12-16', 'PARTIAL', 18, '2025-12-16 19:20:18', '2025-12-16 19:49:19'),
+(2, 10, 500.00, 500.00, '132', '2025-12-16', 'PENDING', 18, '2025-12-16 19:49:08', '2025-12-16 19:49:08');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employee_advance_repayments`
+--
+
+CREATE TABLE `employee_advance_repayments` (
+  `id` int(11) NOT NULL,
+  `advance_id` int(11) NOT NULL COMMENT 'Link to employee_advances table',
+  `employee_id` int(11) NOT NULL,
+  `amount` decimal(15,2) NOT NULL COMMENT 'Amount repaid in this transaction',
+  `date` date NOT NULL COMMENT 'Date of repayment',
+  `notes` varchar(255) DEFAULT NULL COMMENT 'Additional notes for repayment',
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `employee_advance_repayments`
+--
+
+INSERT INTO `employee_advance_repayments` (`id`, `advance_id`, `employee_id`, `amount`, `date`, `notes`, `created_by`, `created_at`) VALUES
+(1, 1, 10, 200.00, '2025-12-16', 'xyz', 18, '2025-12-16 19:34:45'),
+(2, 1, 10, 150.00, '2025-12-16', '356', 18, '2025-12-16 19:49:19');
+
+-- --------------------------------------------------------
+
+--
+-- Stand-in structure for view `employee_advance_summary`
+-- (See below for the actual view)
+--
+CREATE TABLE `employee_advance_summary` (
+`employee_id` int(11)
+,`employee_name` varchar(255)
+,`total_advances` bigint(21)
+,`pending_amount` decimal(37,2)
+,`total_remaining_balance` decimal(37,2)
+,`total_repaid` decimal(37,2)
+);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employee_weekly_salary`
+--
+
+CREATE TABLE `employee_weekly_salary` (
+  `id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `week_start_date` date NOT NULL,
+  `week_end_date` date NOT NULL,
+  `mon_days` decimal(3,1) DEFAULT 0.0,
+  `mon_ot` decimal(5,2) DEFAULT 0.00,
+  `tue_days` decimal(3,1) DEFAULT 0.0,
+  `tue_ot` decimal(5,2) DEFAULT 0.00,
+  `wed_days` decimal(3,1) DEFAULT 0.0,
+  `wed_ot` decimal(5,2) DEFAULT 0.00,
+  `thu_days` decimal(3,1) DEFAULT 0.0,
+  `thu_ot` decimal(5,2) DEFAULT 0.00,
+  `fri_days` decimal(3,1) DEFAULT 0.0,
+  `fri_ot` decimal(5,2) DEFAULT 0.00,
+  `sat_days` decimal(3,1) DEFAULT 0.0,
+  `sat_ot` decimal(5,2) DEFAULT 0.00,
+  `sun_days` decimal(3,1) DEFAULT 0.0,
+  `sun_ot` decimal(5,2) DEFAULT 0.00,
+  `total_days` decimal(4,1) DEFAULT 0.0,
+  `total_ot` decimal(6,2) DEFAULT 0.00,
+  `total_salary` decimal(12,2) DEFAULT 0.00,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `employee_weekly_salary`
+--
+
+INSERT INTO `employee_weekly_salary` (`id`, `employee_id`, `week_start_date`, `week_end_date`, `mon_days`, `mon_ot`, `tue_days`, `tue_ot`, `wed_days`, `wed_ot`, `thu_days`, `thu_ot`, `fri_days`, `fri_ot`, `sat_days`, `sat_ot`, `sun_days`, `sun_ot`, `total_days`, `total_ot`, `total_salary`, `created_at`, `updated_at`) VALUES
+(16, 9, '2025-12-08', '2025-12-14', 1.0, 0.00, 1.0, 1.00, 1.0, 3.00, 1.0, -2.00, 0.0, 0.00, 1.0, 0.00, 1.0, -3.00, 6.0, -1.00, 2950.00, '2025-12-14 09:56:49', '2025-12-14 09:57:51'),
+(18, 10, '2025-12-08', '2025-12-14', 0.0, 0.00, 0.0, 0.00, 0.0, 0.00, 0.0, 0.00, 0.0, 0.00, 0.0, 0.00, 0.0, 0.00, 0.0, 0.00, 0.00, '2025-12-14 09:57:51', '2025-12-14 09:57:51');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `employee_work_records`
+--
+
+CREATE TABLE `employee_work_records` (
+  `id` int(11) NOT NULL,
+  `employee_id` int(11) NOT NULL,
+  `work_date` date NOT NULL,
+  `working_hours` decimal(4,2) NOT NULL,
+  `overtime_hours` decimal(4,2) DEFAULT 0.00,
+  `daily_salary_paid` decimal(10,2) NOT NULL COMMENT 'Calculated gross pay for the day',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `finishes_table`
+--
+
+CREATE TABLE `finishes_table` (
+  `id` int(11) NOT NULL,
+  `finish` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `finishes_table`
+--
+
+INSERT INTO `finishes_table` (`id`, `finish`) VALUES
+(4, 'SS'),
+(5, 'ANT'),
+(6, 'JET BLACK'),
+(7, 'PVD RG'),
+(8, 'MATT SS'),
+(9, 'MATT ANT');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `inventory_items`
+--
+
+CREATE TABLE `inventory_items` (
+  `id` int(11) NOT NULL,
+  `item_code` varchar(100) NOT NULL,
+  `user` varchar(100) DEFAULT NULL,
+  `code_user` varchar(100) DEFAULT NULL,
+  `stock_quantity` decimal(10,2) DEFAULT 0.00,
+  `finish` varchar(255) DEFAULT NULL,
+  `scrap` decimal(10,2) DEFAULT 0.00,
+  `labour` decimal(10,2) DEFAULT 0.00,
+  `description` text DEFAULT NULL,
+  `kg_dzn` decimal(10,2) DEFAULT 0.00,
+  `pcs_box` int(11) DEFAULT 0,
+  `box_ctn` int(11) DEFAULT 0,
+  `pcs_ctn` int(11) DEFAULT 0,
+  `kg_box` decimal(10,2) DEFAULT 0.00,
+  `empty_wt` decimal(10,2) DEFAULT 0.00,
+  `actual_wt` decimal(10,2) DEFAULT 0.00,
+  `rate_pcs` decimal(10,2) DEFAULT 0.00,
+  `rate_kg` decimal(10,2) DEFAULT 0.00,
+  `total_kg` decimal(10,2) DEFAULT 0.00,
+  `actual_net_kg` decimal(10,2) DEFAULT 0.00,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `pic_or_kg` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `inventory_items`
+--
+
+INSERT INTO `inventory_items` (`id`, `item_code`, `user`, `code_user`, `stock_quantity`, `finish`, `scrap`, `labour`, `description`, `kg_dzn`, `pcs_box`, `box_ctn`, `pcs_ctn`, `kg_box`, `empty_wt`, `actual_wt`, `rate_pcs`, `rate_kg`, `total_kg`, `actual_net_kg`, `created_by`, `created_at`, `updated_at`, `pic_or_kg`) VALUES
+(65, 'S5112316', 'AKSH', 'S5112316AKSH', 0.00, NULL, 0.00, 60.00, 'SMOOTH HINGES 5X1.1/2X3/16', 4.80, 0, 0, 0, 0.00, 0.00, 0.00, 24.00, 60.00, 0.00, 0.00, 18, '2025-12-14 10:10:24', '2025-12-14 10:10:24', 1),
+(66, 'S5114316', 'AKSH', 'S5114316AKSH', 0.00, '', 0.00, 60.00, 'SMOOTH HINGES. 5X1.1/4X3/16', 4.20, 0, 0, 0, 0.00, 0.00, 0.00, 21.00, 60.00, 0.00, 0.00, 18, '2025-12-14 10:10:47', '2025-12-14 10:11:24', 1),
+(67, 'S5118532H//3.400', 'AKSH', 'S5118532HAKSH', 0.00, '', 0.00, 60.00, 'SMOOTH HINGES 5X1.1/8X5/32H', 3.40, 0, 0, 0, 0.00, 0.00, 0.00, 17.00, 60.00, 0.00, 0.00, 18, '2025-12-14 10:11:15', '2025-12-14 10:56:36', 1),
+(68, 'R4006', 'TISA', 'R4006TISA', 0.00, NULL, 0.00, 70.00, 'TOWER BOLT ROUND 6X1/2', 2.50, 0, 0, 0, 0.00, 0.00, 0.00, 14.58, 70.00, 0.00, 0.00, 18, '2025-12-14 10:11:44', '2025-12-14 10:11:44', 1),
+(69, 'R4008', 'TISA', 'R4008', 0.00, '', 0.00, 70.00, 'TOWER BOLT ROUND 8X1/2', 3.30, 0, 0, 0, 0.00, 0.00, 0.00, 19.25, 70.00, 0.00, 0.00, 18, '2025-12-14 10:12:06', '2025-12-14 10:21:34', 1),
+(70, '3126', 'KHUS', '3126KHUS', 0.00, NULL, 0.00, 60.00, 'L HINGES 3X1/2-6 - SILVER', 0.90, 0, 0, 0, 0.00, 0.00, 0.00, 4.50, 60.00, 0.00, 0.00, 18, '2025-12-14 10:12:48', '2025-12-14 10:12:48', 1),
+(71, '31212', 'KHUS', '31212KHUS', 0.00, NULL, 0.00, 60.00, 'L HINGES 3X12-12 - SILVER', 1.00, 0, 0, 0, 0.00, 0.00, 0.00, 5.00, 60.00, 0.00, 0.00, 18, '2025-12-14 10:13:07', '2025-12-14 10:13:07', 1),
+(72, '31219', 'KHUS', '31219KHUS', 0.00, NULL, 0.00, 60.00, 'L HINGES 3X1/2-19 - SILVER', 1.10, 0, 0, 0, 0.00, 0.00, 0.00, 5.50, 60.00, 0.00, 0.00, 18, '2025-12-14 10:13:38', '2025-12-14 10:13:38', 1),
+(73, 'S5112316', 'DEEP', 'S5112316DEEP', 0.00, NULL, 0.00, 50.00, 'SMOOTH HINGES 5X1.1/2X3/16', 4.80, 0, 0, 0, 0.00, 0.00, 0.00, 20.00, 50.00, 0.00, 0.00, 18, '2025-12-14 10:16:59', '2025-12-14 10:16:59', 1),
+(74, 'S5114316', 'DEEP', 'S5114316DEEP', 0.00, NULL, 0.00, 50.00, 'SMOOTH HINGES. 5X1.1/4X3/16', 4.20, 0, 0, 0, 0.00, 0.00, 0.00, 17.50, 50.00, 0.00, 0.00, 18, '2025-12-14 10:17:17', '2025-12-14 10:17:17', 1),
+(75, 'S5118532H//3.400', 'DEEP', 'S5118532H', 0.00, '', 0.00, 50.00, 'SMOOTH HINGES 5X1.1/8X5/32H', 3.40, 0, 0, 0, 0.00, 0.00, 0.00, 14.17, 50.00, 0.00, 0.00, 18, '2025-12-14 10:17:37', '2025-12-14 10:56:30', 1),
+(76, '3126', 'SVBK', '3126SVBK', 0.00, 'SS', 0.00, 100.00, 'L HINGES 3X1/2-6 - SILVER', 0.90, 24, 24, 576, 1.86, 0.06, 0.05, 7.50, 100.00, 0.00, 0.00, 18, '2025-12-14 10:25:12', '2025-12-14 10:25:12', 1),
+(78, '31212', 'SVBK', '31212SVBK', 0.00, 'SS', 0.00, 100.00, 'L HINGES 3X12-12 - SILVER', 1.00, 24, 24, 576, 2.07, 0.07, 0.06, 8.33, 100.00, 0.00, 0.00, 18, '2025-12-14 10:26:15', '2025-12-14 10:26:15', 1),
+(79, '31219', 'SVBK', '31219SVBK', 0.00, 'SS', 0.00, 100.00, 'L HINGES 3X1/2-19 - SILVER', 1.10, 24, 15, 360, 2.28, 0.08, 0.07, 9.17, 100.00, 0.00, 0.00, 18, '2025-12-14 10:27:35', '2025-12-14 10:27:35', 1),
+(80, 'S5112316', 'SVBK', 'S5112316SVBK', 0.00, NULL, 0.00, 140.00, 'SMOOTH HINGES 5X1.1/2X3/16', 4.80, 5, 20, 100, 2.05, 0.05, 0.04, 56.00, 140.00, 0.00, 0.00, 18, '2025-12-14 10:28:28', '2025-12-14 10:28:28', 1),
+(81, 'S5112316', 'NTHY', 'S5112316NTHY', 0.00, NULL, 0.00, 100.00, 'SMOOTH HINGES 5X1.1/2X3/16', 4.80, 5, 20, 100, 2.05, 0.05, 0.04, 40.00, 100.00, 0.00, 0.00, 18, '2025-12-14 10:29:56', '2025-12-14 10:29:56', 0),
+(82, 'S5118532H//3.400', 'NTHY', 'S5118532HNTHY', 0.00, '', 0.00, 100.00, 'SMOOTH HINGES 5X1.1/8X5/32H', 3.40, 5, 20, 100, 1.46, 0.05, 0.04, 28.33, 100.00, 0.00, 0.00, 18, '2025-12-14 10:30:57', '2025-12-14 10:56:25', 0),
+(83, 'R4006', 'NTHY', 'R4006NTHY', 0.00, NULL, 0.00, 140.00, 'TOWER BOLT ROUND 6X1/2', 2.50, 6, 20, 120, 1.30, 0.05, 0.04, 29.17, 140.00, 0.00, 0.00, 18, '2025-12-14 10:31:56', '2025-12-14 10:31:56', 0),
+(84, 'R4008', 'NTHY', 'R4008NTHY', 0.00, NULL, 0.00, 140.00, 'TOWER BOLT ROUND 8X1/2', 3.30, 6, 20, 120, 1.65, 0.05, 0.04, 38.50, 140.00, 0.00, 0.00, 18, '2025-12-14 10:32:50', '2025-12-14 10:32:50', 0),
+(85, 'STEEL5', 'SHIV', 'STEEL5SHIV', 0.00, NULL, 0.00, 0.00, 'STEEL 5', 0.50, 0, 0, 0, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 0.00, 18, '2025-12-14 11:59:04', '2025-12-14 11:59:04', 0);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `invoices`
+--
+
+CREATE TABLE `invoices` (
+  `id` int(11) NOT NULL,
+  `invoice_number` varchar(50) NOT NULL,
+  `invoice_date` date NOT NULL,
+  `customer_id` varchar(255) DEFAULT NULL,
+  `reference_no_1` varchar(100) DEFAULT NULL,
+  `reference_no_2` varchar(100) DEFAULT NULL,
+  `sub_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `gst_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `grand_total` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `remaining_amount` int(11) NOT NULL DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `tr_number` varchar(50) DEFAULT NULL,
+  `lr_number` varchar(100) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `invoices`
+--
+
+INSERT INTO `invoices` (`id`, `invoice_number`, `invoice_date`, `customer_id`, `reference_no_1`, `reference_no_2`, `sub_total`, `gst_amount`, `grand_total`, `remaining_amount`, `created_at`, `updated_at`, `tr_number`, `lr_number`) VALUES
+(64, '6565', '2025-12-15', 'SVBK', '1200', '452', 23657.14, 4258.29, 27915.43, 27915, '2025-12-15 09:56:06', '2025-12-15 09:56:06', NULL, NULL),
+(65, 'inv0123', '2025-12-16', 'NTHY', 'REF-001', '17604.13', 14918.75, 2685.38, 17604.13, 17604, '2025-12-16 19:53:46', '2025-12-16 19:53:46', 'GAJANAND', '12512321');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `invoice_items`
+--
+
+CREATE TABLE `invoice_items` (
+  `id` int(11) NOT NULL,
+  `invoice_id` int(11) NOT NULL,
+  `item_code` varchar(100) NOT NULL,
+  `item_description` text DEFAULT NULL,
+  `item_size` varchar(50) DEFAULT NULL,
+  `item_finish` varchar(50) DEFAULT NULL,
+  `pcs_per_box` int(11) DEFAULT 0,
+  `total_boxes` int(11) DEFAULT 0,
+  `extra_pcs` int(11) DEFAULT 0,
+  `total_pcs` int(11) DEFAULT 0,
+  `pcs_rate` decimal(10,2) DEFAULT NULL,
+  `rate_kg` decimal(10,2) DEFAULT NULL,
+  `total_rs` decimal(12,2) DEFAULT NULL,
+  `total_weight` decimal(10,3) DEFAULT NULL,
+  `scrap_lb` decimal(10,3) DEFAULT NULL,
+  `brass` decimal(10,3) DEFAULT NULL,
+  `kg_box` decimal(10,3) DEFAULT NULL,
+  `lb` decimal(10,3) DEFAULT NULL,
+  `box_wt` decimal(10,3) DEFAULT NULL,
+  `tmp_wt` decimal(10,3) DEFAULT NULL,
+  `net_kg` decimal(10,3) DEFAULT NULL,
+  `box_name` varchar(100) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `invoice_items`
+--
+
+INSERT INTO `invoice_items` (`id`, `invoice_id`, `item_code`, `item_description`, `item_size`, `item_finish`, `pcs_per_box`, `total_boxes`, `extra_pcs`, `total_pcs`, `pcs_rate`, `rate_kg`, `total_rs`, `total_weight`, `scrap_lb`, `brass`, `kg_box`, `lb`, `box_wt`, `tmp_wt`, `net_kg`, `box_name`) VALUES
+(92, 64, '31212', 'L HINGES 3X12-12 - SILVER', NULL, 'SS', 24, 10, 0, 24, 985.71, NULL, 23657.14, 20.000, 700.000, 600.000, 2.070, 100.000, 0.070, 0.060, 19.900, NULL),
+(93, 65, 'R4008', 'TOWER BOLT ROUND 8X1/2', NULL, 'ANT', 6, 10, 10, 70, 213.13, NULL, 14918.75, 18.750, 775.000, 635.000, 1.650, 140.000, 0.050, 0.040, 15.900, '123');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `journal_customers`
+--
+
+CREATE TABLE `journal_customers` (
+  `id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `notes` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `journal_entries`
+--
+
+CREATE TABLE `journal_entries` (
+  `id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `type` enum('Payment','Receipt') NOT NULL,
+  `customer_name` varchar(255) NOT NULL,
+  `method_id` int(11) NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `notes` text DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `master_items`
+--
+
+CREATE TABLE `master_items` (
+  `id` int(11) NOT NULL,
+  `item_code` varchar(50) NOT NULL,
+  `description` text DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `kg_dz` decimal(10,2) NOT NULL,
+  `stock_quantity` decimal(10,2) DEFAULT 0.00,
+  `stock_kg` decimal(15,3) NOT NULL DEFAULT 0.000
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `master_items`
+--
+
+INSERT INTO `master_items` (`id`, `item_code`, `description`, `created_by`, `created_at`, `updated_at`, `kg_dz`, `stock_quantity`, `stock_kg`) VALUES
+(13, 'S5118532H//3.400', 'SMOOTH HINGES 5X1.1/8X5/32H', 18, '2025-12-14 10:01:37', '2025-12-14 11:06:25', 3.40, 690.91, 190.000),
+(14, 'S5114316', 'SMOOTH HINGES. 5X1.1/4X3/16', 18, '2025-12-14 10:02:44', '2025-12-14 11:01:38', 4.20, 986.52, 337.060),
+(15, 'S5112316', 'SMOOTH HINGES 5X1.1/2X3/16', 18, '2025-12-14 10:03:50', '2025-12-14 11:04:03', 4.80, 485.11, 190.000),
+(16, 'R4006', 'TOWER BOLT ROUND 6X1/2', 18, '2025-12-14 10:05:31', '2025-12-14 10:05:31', 2.50, 0.00, 0.000),
+(17, 'R4008', 'TOWER BOLT ROUND 8X1/2', 18, '2025-12-14 10:06:06', '2025-12-16 19:53:46', 3.30, -70.00, -15.900),
+(18, '3126', 'L HINGES 3X1/2-6 - SILVER', 18, '2025-12-14 10:06:29', '2025-12-14 10:07:17', 0.90, 0.00, 0.000),
+(19, '31212', 'L HINGES 3X12-12 - SILVER', 18, '2025-12-14 10:07:07', '2025-12-15 09:56:06', 1.00, -24.00, -19.900),
+(20, '31219', 'L HINGES 3X1/2-19 - SILVER', 18, '2025-12-14 10:08:19', '2025-12-14 10:08:19', 1.10, 0.00, 0.000),
+(21, 'STEEL5', 'STEEL 5', 18, '2025-12-14 11:58:08', '2025-12-14 11:58:08', 0.50, 0.00, 0.000);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `order_stock`
+--
+
+CREATE TABLE `order_stock` (
+  `id` int(11) NOT NULL,
+  `order_stock` varchar(255) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `order_stock`
+--
+
+INSERT INTO `order_stock` (`id`, `order_stock`) VALUES
+(4, 'PLAN'),
+(7, 'STOCK');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `pati_table`
+--
+
+CREATE TABLE `pati_table` (
+  `id` int(11) NOT NULL,
+  `pati_type` varchar(255) NOT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `pati_table`
+--
+
+INSERT INTO `pati_table` (`id`, `pati_type`, `created_by`, `created_at`, `updated_at`) VALUES
+(6, 'OTIX-700', 18, '2025-12-14 10:15:42', '2025-12-14 10:15:42'),
+(7, 'OTIX-750', 18, '2025-12-14 10:15:53', '2025-12-14 10:15:53');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payments`
+--
+
+CREATE TABLE `payments` (
+  `id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `account_id` int(11) DEFAULT NULL,
+  `contact_id` int(11) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `reference` varchar(255) DEFAULT NULL,
+  `note` text DEFAULT NULL,
+  `image_url` varchar(255) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payment_methods`
+--
+
+CREATE TABLE `payment_methods` (
+  `id` int(11) NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `payment_methods`
+--
+
+INSERT INTO `payment_methods` (`id`, `name`, `created_at`, `updated_at`) VALUES
+(1, 'Cash', '2025-12-05 19:13:48', '2025-12-05 19:13:48'),
+(2, 'Bank Transfer', '2025-12-05 19:13:48', '2025-12-05 19:13:48'),
+(3, 'Cheque', '2025-12-05 19:13:48', '2025-12-05 19:13:48'),
+(4, 'UPI', '2025-12-05 19:13:48', '2025-12-05 19:13:48'),
+(5, 'Card', '2025-12-05 19:13:48', '2025-12-05 19:13:48');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_invoices`
+--
+
+CREATE TABLE `purchase_invoices` (
+  `id` int(11) NOT NULL,
+  `code_user` varchar(255) NOT NULL,
+  `user` varchar(255) NOT NULL,
+  `invoice_number` varchar(255) NOT NULL,
+  `issue_date` varchar(255) NOT NULL,
+  `due_date` date NOT NULL,
+  `image_url` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `purchase_invoices`
+--
+
+INSERT INTO `purchase_invoices` (`id`, `code_user`, `user`, `invoice_number`, `issue_date`, `due_date`, `image_url`, `created_at`, `updated_at`) VALUES
+(1, 'AKSH', 'AKSH', '12-003', '2025-12-14', '2025-12-15', '', '2025-12-14 11:01:38', '2025-12-14 11:01:38'),
+(2, 'AKSH', 'AKSH', '12-009', '2025-12-14', '2025-12-15', '', '2025-12-14 11:04:03', '2025-12-14 11:04:03'),
+(3, 'DEEP', 'DEEP', '12006', '2025-12-14', '2025-12-15', '', '2025-12-14 11:06:25', '2025-12-14 11:07:28');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `purchase_invoice_items`
+--
+
+CREATE TABLE `purchase_invoice_items` (
+  `id` int(11) NOT NULL,
+  `invoice_id` int(11) NOT NULL,
+  `item_code` varchar(100) NOT NULL,
+  `code` varchar(50) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `stock_kg` decimal(10,2) DEFAULT 0.00,
+  `scrap` decimal(10,2) DEFAULT 0.00,
+  `labour` decimal(10,2) DEFAULT 0.00,
+  `kg_dzn` decimal(10,2) DEFAULT 0.00,
+  `actual_dzn_wt` decimal(10,2) DEFAULT 0.00,
+  `total_per_6a` decimal(10,2) DEFAULT 0.00,
+  `rate_pcr` decimal(10,2) DEFAULT 0.00,
+  `total_kg` decimal(10,2) DEFAULT 0.00,
+  `no_of_peti` int(11) DEFAULT 0,
+  `peti_wt` decimal(10,2) DEFAULT 0.00,
+  `peti_balance` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `ret_peti_no` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `peti_Type` varchar(50) DEFAULT NULL,
+  `net_kg` decimal(10,2) DEFAULT 0.00,
+  `amount` decimal(10,2) DEFAULT 0.00,
+  `notes` text DEFAULT NULL,
+  `pati_status` varchar(50) DEFAULT 'Active',
+  `pic_or_kg` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `total_psc` decimal(10,2) DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `purchase_invoice_items`
+--
+
+INSERT INTO `purchase_invoice_items` (`id`, `invoice_id`, `item_code`, `code`, `description`, `stock_kg`, `scrap`, `labour`, `kg_dzn`, `actual_dzn_wt`, `total_per_6a`, `rate_pcr`, `total_kg`, `no_of_peti`, `peti_wt`, `peti_balance`, `ret_peti_no`, `peti_Type`, `net_kg`, `amount`, `notes`, `pati_status`, `pic_or_kg`, `created_at`, `updated_at`, `total_psc`) VALUES
+(1, 1, 'S5114316AKSH', 'S5114316', 'SMOOTH HINGES. 5X1.1/4X3/16', 100.00, 0.00, 60.00, 4.20, 4.10, 0.00, 20.50, 344.06, 10, 7.00, 0.00, 10.00, 'WD', 337.06, 20223.60, '', '0', 1, '2025-12-14 11:01:38', '2025-12-14 11:01:38', 986.52),
+(2, 2, 'S5112316AKSH', 'S5112316', 'SMOOTH HINGES 5X1.1/2X3/16', 0.00, 0.00, 60.00, 4.80, 4.70, 0.00, 23.50, 200.00, 10, 10.00, 0.00, 10.00, 'WD', 190.00, 11400.00, '', '0', 1, '2025-12-14 11:04:03', '2025-12-14 11:04:03', 485.11),
+(3, 3, 'S5114316DEEP', 'S5114316', 'SMOOTH HINGES. 5X1.1/4X3/16', 0.00, 0.00, 50.00, 4.20, 3.30, 0.00, 13.75, 300.00, 10, 10.00, 0.00, 10.00, '', 290.00, 14500.00, '', '0', 1, '2025-12-14 11:06:25', '2025-12-14 11:07:58', 1054.55);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `receipts`
+--
+
+CREATE TABLE `receipts` (
+  `id` int(11) NOT NULL,
+  `date` date NOT NULL,
+  `amount` decimal(15,2) NOT NULL,
+  `contact_id` int(11) DEFAULT NULL,
+  `account_id` int(11) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `reference` varchar(255) DEFAULT NULL,
+  `note` text DEFAULT NULL,
+  `image_url` varchar(255) DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sales_invoice`
+--
+
+CREATE TABLE `sales_invoice` (
+  `id` int(11) NOT NULL,
+  `customer` varchar(255) NOT NULL,
+  `invoice_no` varchar(50) NOT NULL,
+  `invoice_date` date NOT NULL,
+  `due_date` date NOT NULL,
+  `status` varchar(20) NOT NULL,
+  `no1` int(11) NOT NULL,
+  `no2` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `sr_no` varchar(255) DEFAULT NULL,
+  `item_code` varchar(255) DEFAULT NULL,
+  `item_description_size` text DEFAULT NULL,
+  `item_finish` varchar(255) DEFAULT NULL,
+  `pcs_per_box` int(11) DEFAULT 0,
+  `extra_pcs` int(11) DEFAULT 0,
+  `total_pcs` int(11) DEFAULT 0,
+  `total_weight` decimal(10,2) DEFAULT 0.00,
+  `scrap_lb` decimal(10,2) DEFAULT 0.00,
+  `total_rs` decimal(10,2) DEFAULT 0.00,
+  `brass` decimal(10,2) DEFAULT 0.00,
+  `lb` decimal(10,2) DEFAULT 0.00,
+  `kg_per_box` decimal(10,2) DEFAULT 0.00,
+  `pcs_rate` decimal(10,2) DEFAULT 0.00,
+  `box_wt` decimal(10,2) DEFAULT 0.00,
+  `tmp_wt` decimal(10,2) DEFAULT 0.00,
+  `net_kg` decimal(10,2) DEFAULT 0.00,
+  `ctn_no` int(11) DEFAULT 0,
+  `ctn_wt` decimal(10,2) DEFAULT 0.00,
+  `weight_per_ctn` decimal(10,2) DEFAULT 0.00,
+  `gst` decimal(5,2) DEFAULT 0.00,
+  `total` decimal(10,2) DEFAULT 0.00,
+  `grand_total` decimal(10,2) DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sales_orders`
+--
+
+CREATE TABLE `sales_orders` (
+  `id` int(11) NOT NULL,
+  `order_number` int(11) DEFAULT NULL,
+  `order_date` varchar(255) DEFAULT NULL,
+  `customer_id` varchar(255) DEFAULT NULL,
+  `item_code` varchar(255) DEFAULT NULL,
+  `finish` varchar(255) DEFAULT NULL,
+  `stock_qty` decimal(10,2) DEFAULT NULL,
+  `scrap` decimal(10,2) DEFAULT NULL,
+  `labour` decimal(10,2) DEFAULT NULL,
+  `kg_dzn` decimal(10,2) DEFAULT NULL,
+  `pcs_box` int(11) DEFAULT NULL,
+  `box_ctn` int(11) DEFAULT NULL,
+  `pcs_ctn` int(11) DEFAULT NULL,
+  `kg_box` decimal(10,2) DEFAULT NULL,
+  `qty_ctn` decimal(10,2) DEFAULT NULL,
+  `total_kg` decimal(10,2) DEFAULT NULL,
+  `quantity_pcs` int(11) DEFAULT NULL,
+  `order_stock` varchar(255) DEFAULT NULL,
+  `manufacturer_name` varchar(255) DEFAULT NULL,
+  `po_vr` varchar(255) DEFAULT NULL,
+  `note` text DEFAULT NULL,
+  `invoice_status` varchar(255) DEFAULT NULL,
+  `created_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `customer_code` varchar(255) DEFAULT NULL,
+  `customer_name` varchar(255) DEFAULT NULL,
+  `rate_pcs` decimal(10,2) DEFAULT NULL,
+  `rate_kz` decimal(10,2) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `sales_orders`
+--
+
+INSERT INTO `sales_orders` (`id`, `order_number`, `order_date`, `customer_id`, `item_code`, `finish`, `stock_qty`, `scrap`, `labour`, `kg_dzn`, `pcs_box`, `box_ctn`, `pcs_ctn`, `kg_box`, `qty_ctn`, `total_kg`, `quantity_pcs`, `order_stock`, `manufacturer_name`, `po_vr`, `note`, `invoice_status`, `created_by`, `created_at`, `updated_at`, `customer_code`, `customer_name`, `rate_pcs`, `rate_kz`) VALUES
+(34, 1, '2025-12-14', '31219SVBK', '31219', 'SS', 0.00, 600.00, 100.00, 1.10, 24, 15, 360, 2.28, 3.33, 110.00, 1200, 'STOCK', 'KHUS', 'ok', '', 'Uninvoiced', 18, '2025-12-14 10:36:20', '2025-12-15 09:48:04', 'SVBK', '', 64.17, 700.00),
+(35, 1, '2025-12-01', '31212SVBK', '31212', 'SS', NULL, 600.00, 100.00, 1.00, 24, 24, 576, 2.07, 1.74, 83.33, 976, 'STOCK', 'KHUS', 'ok', NULL, 'Uninvoiced', 18, '2025-12-14 10:38:42', '2025-12-15 09:56:06', 'SVBK', NULL, 58.33, 700.00),
+(36, 1, '2025-12-14', '3126SVBK', '3126', 'SS', NULL, 600.00, 100.00, 0.90, 24, 24, 576, 1.86, 1.56, 67.50, 900, 'STOCK', 'KHUS', 'ok', NULL, 'Uninvoiced', 18, '2025-12-14 10:39:27', '2025-12-14 10:39:27', 'SVBK', NULL, 52.50, 700.00),
+(40, 1, '2025-12-14', 'S5112316SVBK', 'S5112316', 'SS', NULL, 620.00, 140.00, 4.80, 5, 20, 100, 2.05, 3.00, 120.00, 300, 'STOCK', 'AKSH', NULL, NULL, 'Uninvoiced', 18, '2025-12-14 10:52:27', '2025-12-14 10:52:27', 'SVBK', NULL, 304.00, 760.00),
+(47, 1, '2025-12-14', 'R4006NTHY', 'R4006', 'ANT', NULL, 609.00, 140.00, 2.50, 6, 20, 120, 1.30, 2.00, 50.00, 240, 'STOCK', 'TISA', NULL, NULL, 'Uninvoiced', 18, '2025-12-14 11:40:04', '2025-12-14 11:40:04', 'NTHY', NULL, 156.04, 749.00),
+(48, 1, '2025-12-14', 'R4008NTHY', 'R4008', 'ANT', NULL, 635.00, 140.00, 3.30, 6, 20, 120, 1.65, 1.67, 55.00, 130, 'STOCK', 'TISA', NULL, NULL, 'Uninvoiced', 18, '2025-12-14 11:40:31', '2025-12-16 19:53:46', 'NTHY', NULL, 213.13, 775.00),
+(49, 1, '2025-12-14', 'S5112316NTHY', 'S5112316', 'SS', 485.11, 620.00, 100.00, 4.80, 5, 20, 100, 2.05, 2.00, 80.00, 200, 'STOCK', 'AKSH', '', '', 'Uninvoiced', 18, '2025-12-14 11:41:01', '2025-12-15 09:47:46', 'NTHY', '', 288.00, 720.00);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `shipping_cartons`
+--
+
+CREATE TABLE `shipping_cartons` (
+  `id` int(11) NOT NULL,
+  `invoice_id` int(11) NOT NULL,
+  `carton_number` varchar(100) NOT NULL,
+  `carton_weight` decimal(10,3) DEFAULT 0.000,
+  `weight_per_ctn` decimal(10,3) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `shipping_cartons`
+--
+
+INSERT INTO `shipping_cartons` (`id`, `invoice_id`, `carton_number`, `carton_weight`, `weight_per_ctn`) VALUES
+(40, 64, 'CTN', 0.500, 35.000),
+(41, 65, 'CTN', 150.000, 1.000);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stock_history`
+--
+
+CREATE TABLE `stock_history` (
+  `id` int(11) NOT NULL,
+  `item_code` varchar(191) NOT NULL,
+  `transaction_type` enum('CREDIT','DEBIT') NOT NULL COMMENT 'CREDIT = Stock In, DEBIT = Stock Out',
+  `invoice_type` enum('PURCHASE','SALES') NOT NULL,
+  `invoice_number` varchar(191) DEFAULT NULL,
+  `quantity_pcs` decimal(15,3) NOT NULL DEFAULT 0.000,
+  `quantity_kg` decimal(15,3) NOT NULL DEFAULT 0.000,
+  `movement_date` date NOT NULL,
+  `note` text DEFAULT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `stock_history`
+--
+
+INSERT INTO `stock_history` (`id`, `item_code`, `transaction_type`, `invoice_type`, `invoice_number`, `quantity_pcs`, `quantity_kg`, `movement_date`, `note`, `user_id`, `created_at`, `updated_at`) VALUES
+(2, 'S5114316', 'CREDIT', 'PURCHASE', '12-003', 986.520, 337.060, '2025-12-14', NULL, NULL, '2025-12-14 11:01:38', '2025-12-14 11:01:38'),
+(3, 'S5112316', 'CREDIT', 'PURCHASE', '12-009', 485.110, 190.000, '2025-12-14', NULL, NULL, '2025-12-14 11:04:03', '2025-12-14 11:04:03'),
+(4, 'S5118532H//3.400', 'CREDIT', 'PURCHASE', '12=006', 690.910, 190.000, '2025-12-14', NULL, NULL, '2025-12-14 11:06:25', '2025-12-14 11:06:25'),
+(5, '31212', 'DEBIT', 'SALES', '6565', 24.000, 19.900, '2025-12-15', NULL, NULL, '2025-12-15 09:56:06', '2025-12-15 09:56:06'),
+(6, 'R4008', 'DEBIT', 'SALES', 'inv0123', 70.000, 15.900, '2025-12-16', NULL, NULL, '2025-12-16 19:53:46', '2025-12-16 19:53:46');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `supplier_details`
+--
+
+CREATE TABLE `supplier_details` (
+  `id` int(11) NOT NULL,
+  `contact_id` int(11) NOT NULL,
+  `credit_limit` varchar(50) DEFAULT NULL,
+  `division` varchar(100) DEFAULT NULL,
+  `due_date` date DEFAULT NULL,
+  `payment_status` varchar(50) DEFAULT NULL,
+  `note` text DEFAULT NULL,
+  `total_amount` decimal(10,2) DEFAULT NULL,
+  `notes` varchar(255) DEFAULT NULL,
+  `payment` varchar(255) DEFAULT NULL,
+  `date` date DEFAULT NULL,
+  `order_follow_up` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `supplier_details`
+--
+
+INSERT INTO `supplier_details` (`id`, `contact_id`, `credit_limit`, `division`, `due_date`, `payment_status`, `note`, `total_amount`, `notes`, `payment`, `date`, `order_follow_up`) VALUES
+(29, 63, '0', 'PLAN', '2025-12-14', 'Pending', '', NULL, NULL, NULL, NULL, NULL),
+(30, 64, '0', 'PLAN', '2025-12-14', 'Pending', '', NULL, NULL, NULL, NULL, NULL),
+(31, 65, '0', 'PLAN', '2025-12-14', 'Pending', '', NULL, NULL, NULL, NULL, NULL),
+(32, 68, '0', 'PLAN', '2025-12-14', 'Pending', '', NULL, NULL, NULL, NULL, NULL),
+(33, 69, '0', 'PLAN', '2025-12-14', 'Pending', '', NULL, NULL, NULL, NULL, NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `transport`
+--
+
+CREATE TABLE `transport` (
+  `id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `transport`
+--
+
+INSERT INTO `transport` (`id`, `name`, `created_at`, `updated_at`) VALUES
+(2, 'GAJANAND', '2025-10-17 11:04:35', '2025-10-27 06:32:38'),
+(3, 'VRL', '2025-10-27 06:32:25', '2025-10-27 06:32:25'),
+(4, 'EAGLE', '2025-12-14 10:15:32', '2025-12-14 10:15:32');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `users`
+--
+
+CREATE TABLE `users` (
+  `id` int(11) NOT NULL,
+  `user_name` varchar(50) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `password` varchar(255) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`id`, `user_name`, `email`, `password`, `created_at`) VALUES
+(1, 'johndoe', 'john.doe@example.com', '$2b$10$htl8Op89PyDYKSo40AngXeRZ0QEK5fjVGtIKKe5LyKkI6aW/BBWOW', '2025-08-16 06:48:32'),
+(2, 'harsh', 'harsh@example.com', '$2b$10$MRCzks/PUQBoRDgTiigquO6QeqkG/VhUBwNPppSKSBavhyGVd.YGS', '2025-08-16 07:36:00'),
+(4, 'harshgiri', 'harshgiri@example.com', '$2b$10$LGlgtrzLyFdZmXNBJsotZOAauap5jBOcTpLiC0.1RKYTFxDE2n5Fa', '2025-08-16 07:44:59'),
+(5, 'karan', 'karan@example.com', '$2b$10$7FIrRDP065DOInYAaORpEejIPuiWWOVT6ZB/PHp2yGHnKnAXADkOy', '2025-08-16 07:47:50'),
+(6, 'test_receipt_user', 'receipts@example.com', '$2b$10$ZAe3RM0qsD6XEdwesxKmVekH8goyHawjU3v7BUKItDoRQr4fga50a', '2025-08-23 10:13:52'),
+(7, 'admin_user', 'admin@example.com', '$2b$10$IsiAsxoHgdFo1jvgngRZUebc6mBIYImF1Rfu5ardSKwJaFzaEModu', '2025-08-24 05:58:42'),
+(8, 'kevin', 'kevin@example.com', '$2b$10$4QpTOJY8zEG2/e6kyuz79OT/4gmEmzqzaBMKd6JRFIgnS/dEmVu0K', '2025-08-27 13:33:39'),
+(9, 'dheyu', 'dheyu@example.com', '$2b$10$xIP6OGf5UPLC/2GAISYkCOLP4HFfR/caKhJFy3QXX.myby8AhlR8m', '2025-08-28 06:27:45'),
+(15, 'doller1', 'doller1@gmail.com', '$2b$10$d23adw6/9hNipRv/qY97X.wVZTzqvNcTrkR/0mJRaVyQbGGBz4NEm', '2025-09-13 13:48:58'),
+(17, 'smi', 'smt@example.com', '$2b$10$AfF.rOTHudl24CcJyavexu53rnIZPNwxJ6UmmE8CdzW1.qaHOMOaq', '2025-10-16 20:41:12'),
+(18, 'doller2', 'doller2@gmail.com', '$2b$10$9ExwW3ymIgpBcMeXPMKoBup79CvCqF.U8XhXrj7p.ButykaIb2OOi', '2025-10-23 15:05:00'),
+(19, 'demo@gmail.com', 'demo@gmail.com', '$2b$10$DB2Zky3qu3RA3Xfad2PWhOMS11ca0HNCOoBXxu4vGCOaH1N0geK3a', '2025-10-24 10:05:23');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_activity`
+--
+
+CREATE TABLE `user_activity` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `user_name` varchar(191) NOT NULL,
+  `model_name` varchar(191) NOT NULL COMMENT 'Page / model name (e.g., accounts, inventory_items)',
+  `action_type` enum('CREATE','UPDATE','DELETE','LOGIN','LOGOUT') NOT NULL,
+  `record_id` int(11) DEFAULT NULL COMMENT 'Affected record primary key (if available)',
+  `description` text DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT current_timestamp(),
+  `changes` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL COMMENT 'JSON object storing old and new values for UPDATE actions' CHECK (json_valid(`changes`))
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user_activity`
+--
+
+INSERT INTO `user_activity` (`id`, `user_id`, `user_name`, `model_name`, `action_type`, `record_id`, `description`, `created_at`, `changes`) VALUES
+(1, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-04 19:14:01', NULL),
+(2, 18, 'doller2', 'employees', 'CREATE', 4, 'Created new employee: Dhrumit', '2025-12-04 19:30:55', NULL),
+(3, 18, 'doller2', 'employees', 'CREATE', 5, 'Created new employee: Karan', '2025-12-05 15:31:23', NULL),
+(4, 18, 'doller2', 'payment_methods', 'DELETE', 6, 'Deleted payment method', '2025-12-05 19:22:38', NULL),
+(5, 18, 'doller2', 'journal_entries', 'CREATE', 1, 'Created Receipt entry for Sagar: ₹1000000', '2025-12-05 19:23:30', NULL),
+(6, 18, 'doller2', 'journal_entries', 'CREATE', 2, 'Created Receipt entry for dev: ₹100000', '2025-12-05 19:24:44', NULL),
+(7, 18, 'doller2', 'journal_entries', 'CREATE', 3, 'Created Payment entry for gg: ₹11111', '2025-12-05 19:28:57', NULL),
+(8, 18, 'doller2', 'journal_entries', 'UPDATE', 3, 'Updated journal entry', '2025-12-05 19:29:23', NULL),
+(9, 18, 'doller2', 'journal_entries', 'CREATE', 4, 'Created Payment entry for Hello: ₹10000', '2025-12-07 13:03:59', NULL),
+(10, 18, 'doller2', 'employees', 'CREATE', 8, 'Created new employee: dhruv', '2025-12-07 18:39:34', NULL),
+(11, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-13 10:04:13', NULL),
+(12, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-13 10:04:32', NULL),
+(13, 18, 'doller2', 'journal_entries', 'CREATE', 5, 'Created Receipt entry for ee: ₹333', '2025-12-13 10:10:06', NULL),
+(14, 18, 'doller2', 'journal_entries', 'DELETE', 5, 'Deleted journal entry', '2025-12-13 10:10:15', NULL),
+(15, 18, 'doller2', 'journal_entries', 'DELETE', 4, 'Deleted journal entry', '2025-12-13 10:10:18', NULL),
+(16, 18, 'doller2', 'journal_entries', 'DELETE', 3, 'Deleted journal entry', '2025-12-13 10:10:22', NULL),
+(17, 18, 'doller2', 'journal_entries', 'DELETE', 2, 'Deleted journal entry', '2025-12-13 10:10:25', NULL),
+(18, 18, 'doller2', 'journal_entries', 'DELETE', 1, 'Deleted journal entry', '2025-12-13 10:10:28', NULL),
+(19, 18, 'doller2', 'sales_orders', 'UPDATE', 30, 'Updated sales order', '2025-12-13 10:12:15', '{\"scrap\": {\"new\": 540, \"old\": \"640.00\"}, \"kg_box\": {\"new\": 1.55, \"old\": \"1.55\"}, \"kg_dzn\": {\"new\": 3.6, \"old\": \"3.60\"}, \"labour\": {\"new\": 120, \"old\": \"120.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 660, \"old\": \"760.00\"}, \"rate_pcs\": {\"new\": 198, \"old\": \"228.00\"}, \"total_kg\": {\"new\": 60, \"old\": \"60.00\"}, \"stock_qty\": {\"new\": -60, \"old\": \"-60.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(20, 18, 'doller2', 'master_items', 'UPDATE', 11, 'Updated master item', '2025-12-13 13:22:11', '{\"kg_dz\": {\"new\": 3.6, \"old\": \"3.60\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"-166.00\"}}'),
+(21, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-13 18:13:29', NULL),
+(22, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-13 18:15:42', NULL),
+(23, 18, 'doller2', 'employees', 'CREATE', 9, 'Created new employee: RAJ ghaadiya', '2025-12-14 09:54:22', NULL),
+(24, 18, 'doller2', 'employees', 'CREATE', 10, 'Created new employee: ASAD', '2025-12-14 09:57:44', NULL),
+(25, 18, 'doller2', 'employees', 'CREATE', 11, 'Created new employee: DIPPAK', '2025-12-14 09:59:09', NULL),
+(26, 18, 'doller2', 'master_items', 'CREATE', 13, 'Created master item', '2025-12-14 10:01:37', NULL),
+(27, 18, 'doller2', 'master_items', 'UPDATE', 13, 'Updated master item', '2025-12-14 10:01:47', '{\"kg_dz\": {\"new\": 3.4, \"old\": \"3.40\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(28, 18, 'doller2', 'master_items', 'CREATE', 14, 'Created master item', '2025-12-14 10:02:44', NULL),
+(29, 18, 'doller2', 'master_items', 'UPDATE', 13, 'Updated master item', '2025-12-14 10:03:11', '{\"kg_dz\": {\"new\": 3.4, \"old\": \"3.40\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(30, 18, 'doller2', 'master_items', 'CREATE', 15, 'Created master item', '2025-12-14 10:03:50', NULL),
+(31, 18, 'doller2', 'contacts', 'CREATE', 63, 'Created contact', '2025-12-14 10:04:11', NULL),
+(32, 18, 'doller2', 'contacts', 'CREATE', 64, 'Created contact', '2025-12-14 10:04:28', NULL),
+(33, 18, 'doller2', 'contacts', 'CREATE', 65, 'Created contact', '2025-12-14 10:04:50', NULL),
+(34, 18, 'doller2', 'master_items', 'CREATE', 16, 'Created master item', '2025-12-14 10:05:31', NULL),
+(35, 18, 'doller2', 'master_items', 'CREATE', 17, 'Created master item', '2025-12-14 10:06:06', NULL),
+(36, 18, 'doller2', 'master_items', 'CREATE', 18, 'Created master item', '2025-12-14 10:06:29', NULL),
+(37, 18, 'doller2', 'master_items', 'CREATE', 19, 'Created master item', '2025-12-14 10:07:07', NULL),
+(38, 18, 'doller2', 'master_items', 'UPDATE', 18, 'Updated master item', '2025-12-14 10:07:17', '{\"kg_dz\": {\"new\": 0.9, \"old\": \"0.90\"}, \"description\": {\"new\": \"L HINGES 3X1/2-6 - SILVER\", \"old\": \"L HINGES 3X1/2-6\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(39, 18, 'doller2', 'master_items', 'UPDATE', 19, 'Updated master item', '2025-12-14 10:07:51', '{\"kg_dz\": {\"new\": 1, \"old\": \"1.00\"}, \"item_code\": {\"new\": \"31212\", \"old\": \"311212\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(40, 18, 'doller2', 'master_items', 'CREATE', 20, 'Created master item', '2025-12-14 10:08:19', NULL),
+(41, 18, 'doller2', 'contacts', 'CREATE', 66, 'Created contact', '2025-12-14 10:08:37', NULL),
+(42, 18, 'doller2', 'contacts', 'CREATE', 67, 'Created contact', '2025-12-14 10:08:48', NULL),
+(43, 18, 'doller2', 'inventory_items', 'CREATE', 65, 'Created inventory item', '2025-12-14 10:10:24', NULL),
+(44, 18, 'doller2', 'inventory_items', 'CREATE', 66, 'Created inventory item', '2025-12-14 10:10:47', NULL),
+(45, 18, 'doller2', 'inventory_items', 'CREATE', 67, 'Created inventory item', '2025-12-14 10:11:15', NULL),
+(46, 18, 'doller2', 'inventory_items', 'UPDATE', 66, 'Updated inventory item', '2025-12-14 10:11:24', '{\"scrap\": {\"new\": 0, \"old\": \"0.00\"}, \"finish\": {\"new\": \"\", \"old\": null}, \"kg_box\": {\"new\": 0, \"old\": \"0.00\"}, \"kg_dzn\": {\"new\": 4.2, \"old\": \"4.20\"}, \"labour\": {\"new\": 60, \"old\": \"0.00\"}, \"rate_kg\": {\"new\": 60, \"old\": \"0.00\"}, \"empty_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"rate_pcs\": {\"new\": 21, \"old\": \"0.00\"}, \"total_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_net_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(47, 18, 'doller2', 'inventory_items', 'CREATE', 68, 'Created inventory item', '2025-12-14 10:11:44', NULL),
+(48, 18, 'doller2', 'inventory_items', 'CREATE', 69, 'Created inventory item', '2025-12-14 10:12:06', NULL),
+(49, 18, 'doller2', 'inventory_items', 'CREATE', 70, 'Created inventory item', '2025-12-14 10:12:48', NULL),
+(50, 18, 'doller2', 'inventory_items', 'CREATE', 71, 'Created inventory item', '2025-12-14 10:13:07', NULL),
+(51, 18, 'doller2', 'inventory_items', 'CREATE', 72, 'Created inventory item', '2025-12-14 10:13:38', NULL),
+(52, 18, 'doller2', 'finishes', 'CREATE', 4, 'Created finish', '2025-12-14 10:14:16', NULL),
+(53, 18, 'doller2', 'finishes', 'CREATE', 5, 'Created finish', '2025-12-14 10:14:28', NULL),
+(54, 18, 'doller2', 'finishes', 'CREATE', 6, 'Created finish', '2025-12-14 10:14:38', NULL),
+(55, 18, 'doller2', 'finishes', 'CREATE', 7, 'Created finish', '2025-12-14 10:14:48', NULL),
+(56, 18, 'doller2', 'finishes', 'CREATE', 8, 'Created finish', '2025-12-14 10:15:00', NULL),
+(57, 18, 'doller2', 'finishes', 'CREATE', 9, 'Created finish', '2025-12-14 10:15:06', NULL),
+(58, 18, 'doller2', 'transport', 'CREATE', 4, 'Created transport EAGLE', '2025-12-14 10:15:32', NULL),
+(59, 18, 'doller2', 'pati', 'CREATE', 6, 'Created PATI record', '2025-12-14 10:15:42', NULL),
+(60, 18, 'doller2', 'pati', 'CREATE', 7, 'Created PATI record', '2025-12-14 10:15:53', NULL),
+(61, 18, 'doller2', 'contacts', 'CREATE', 68, 'Created contact', '2025-12-14 10:16:30', NULL),
+(62, 18, 'doller2', 'inventory_items', 'CREATE', 73, 'Created inventory item', '2025-12-14 10:16:59', NULL),
+(63, 18, 'doller2', 'inventory_items', 'CREATE', 74, 'Created inventory item', '2025-12-14 10:17:17', NULL),
+(64, 18, 'doller2', 'inventory_items', 'CREATE', 75, 'Created inventory item', '2025-12-14 10:17:37', NULL),
+(65, 18, 'doller2', 'inventory_items', 'UPDATE', 75, 'Updated inventory item', '2025-12-14 10:18:02', '{\"user\": {\"new\": \"DEEP\", \"old\": null}, \"scrap\": {\"new\": 0, \"old\": \"0.00\"}, \"finish\": {\"new\": \"\", \"old\": null}, \"kg_box\": {\"new\": 0, \"old\": \"0.00\"}, \"kg_dzn\": {\"new\": 3.4, \"old\": \"3.40\"}, \"labour\": {\"new\": 50, \"old\": \"50.00\"}, \"rate_kg\": {\"new\": 50, \"old\": \"50.00\"}, \"empty_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"rate_pcs\": {\"new\": 14.17, \"old\": \"14.17\"}, \"total_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_net_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(66, 18, 'doller2', 'sales_orders', 'CREATE', 31, 'Created sales order', '2025-12-14 10:18:51', NULL),
+(67, 18, 'doller2', 'sales_orders', 'DELETE', 31, 'Deleted sales order', '2025-12-14 10:19:18', NULL),
+(68, 18, 'doller2', 'inventory_items', 'UPDATE', 69, 'Updated inventory item', '2025-12-14 10:21:34', '{\"user\": {\"new\": \"TISA\", \"old\": null}, \"scrap\": {\"new\": 0, \"old\": \"0.00\"}, \"finish\": {\"new\": \"\", \"old\": null}, \"kg_box\": {\"new\": 0, \"old\": \"0.00\"}, \"kg_dzn\": {\"new\": 3.3, \"old\": \"3.30\"}, \"labour\": {\"new\": 70, \"old\": \"70.00\"}, \"rate_kg\": {\"new\": 70, \"old\": \"70.00\"}, \"empty_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"rate_pcs\": {\"new\": 19.25, \"old\": \"19.25\"}, \"total_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_net_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(69, 18, 'doller2', 'inventory_items', 'CREATE', 76, 'Created inventory item', '2025-12-14 10:25:12', NULL),
+(70, 18, 'doller2', 'inventory_items', 'CREATE', 78, 'Created inventory item', '2025-12-14 10:26:15', NULL),
+(71, 18, 'doller2', 'inventory_items', 'CREATE', 79, 'Created inventory item', '2025-12-14 10:27:35', NULL),
+(72, 18, 'doller2', 'inventory_items', 'CREATE', 80, 'Created inventory item', '2025-12-14 10:28:28', NULL),
+(73, 18, 'doller2', 'inventory_items', 'CREATE', 81, 'Created inventory item', '2025-12-14 10:29:56', NULL),
+(74, 18, 'doller2', 'inventory_items', 'CREATE', 82, 'Created inventory item', '2025-12-14 10:30:57', NULL),
+(75, 18, 'doller2', 'inventory_items', 'CREATE', 83, 'Created inventory item', '2025-12-14 10:31:56', NULL),
+(76, 18, 'doller2', 'inventory_items', 'CREATE', 84, 'Created inventory item', '2025-12-14 10:32:50', NULL),
+(77, 18, 'doller2', 'sales_orders', 'CREATE', 32, 'Created sales order', '2025-12-14 10:34:13', NULL),
+(78, 18, 'doller2', 'sales_orders', 'UPDATE', 32, 'Updated sales order', '2025-12-14 10:34:35', '{\"note\": {\"new\": \"\", \"old\": null}, \"po_vr\": {\"new\": \"\", \"old\": null}, \"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 1.86, \"old\": \"1.86\"}, \"kg_dzn\": {\"new\": 0.9, \"old\": \"0.90\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"1.00\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 52.5, \"old\": \"52.50\"}, \"total_kg\": {\"new\": 86.4, \"old\": \"43.20\"}, \"stock_qty\": {\"new\": 0, \"old\": null}, \"order_date\": {\"old\": \"2025-12-01\"}, \"quantity_pcs\": {\"new\": 1152, \"old\": null}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(79, 18, 'doller2', 'sales_orders', 'UPDATE', 32, 'Updated sales order', '2025-12-14 10:34:52', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 1.86, \"old\": \"1.86\"}, \"kg_dzn\": {\"new\": 0.9, \"old\": \"0.90\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 52.5, \"old\": \"52.50\"}, \"total_kg\": {\"new\": 86.4, \"old\": \"86.40\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"order_number\": {\"new\": 2, \"old\": 1}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(80, 18, 'doller2', 'sales_orders', 'UPDATE', 32, 'Updated sales order', '2025-12-14 10:35:00', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 1.86, \"old\": \"1.86\"}, \"kg_dzn\": {\"new\": 0.9, \"old\": \"0.90\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 52.5, \"old\": \"52.50\"}, \"total_kg\": {\"new\": 86.4, \"old\": \"86.40\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(81, 18, 'doller2', 'sales_orders', 'UPDATE', 32, 'Updated sales order', '2025-12-14 10:35:10', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 1.86, \"old\": \"1.86\"}, \"kg_dzn\": {\"new\": 0.9, \"old\": \"0.90\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 52.5, \"old\": \"52.50\"}, \"total_kg\": {\"new\": 86.4, \"old\": \"86.40\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(82, 18, 'doller2', 'sales_orders', 'UPDATE', 32, 'Updated sales order', '2025-12-14 10:35:17', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 1.86, \"old\": \"1.86\"}, \"kg_dzn\": {\"new\": 0.9, \"old\": \"0.90\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 52.5, \"old\": \"52.50\"}, \"total_kg\": {\"new\": 86.4, \"old\": \"86.40\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(83, 18, 'doller2', 'sales_orders', 'CREATE', 33, 'Created sales order', '2025-12-14 10:35:41', NULL),
+(84, 18, 'doller2', 'sales_orders', 'DELETE', 32, 'Deleted sales order (batch)', '2025-12-14 10:35:51', NULL),
+(85, 18, 'doller2', 'sales_orders', 'CREATE', 34, 'Created sales order', '2025-12-14 10:36:20', NULL),
+(86, 18, 'doller2', 'sales_orders', 'UPDATE', 33, 'Updated sales order', '2025-12-14 10:36:29', '{\"note\": {\"new\": \"\", \"old\": null}, \"po_vr\": {\"new\": \"\", \"old\": null}, \"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.07, \"old\": \"2.07\"}, \"kg_dzn\": {\"new\": 1, \"old\": \"1.00\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2.6, \"old\": \"2.60\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 58.33, \"old\": \"58.33\"}, \"total_kg\": {\"new\": 125, \"old\": \"125.00\"}, \"stock_qty\": {\"new\": 0, \"old\": null}, \"order_date\": {\"old\": \"2025-12-14\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(87, 18, 'doller2', 'sales_orders', 'UPDATE', 33, 'Updated sales order', '2025-12-14 10:36:46', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.07, \"old\": \"2.07\"}, \"kg_dzn\": {\"new\": 1, \"old\": \"1.00\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2.6, \"old\": \"2.60\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 58.33, \"old\": \"58.33\"}, \"total_kg\": {\"new\": 125, \"old\": \"125.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(88, 18, 'doller2', 'sales_orders', 'UPDATE', 33, 'Updated sales order', '2025-12-14 10:37:02', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.07, \"old\": \"2.07\"}, \"kg_dzn\": {\"new\": 1, \"old\": \"1.00\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2.6, \"old\": \"2.60\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 58.33, \"old\": \"58.33\"}, \"total_kg\": {\"new\": 125, \"old\": \"125.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(89, 18, 'doller2', 'sales_orders', 'UPDATE', 33, 'Updated sales order', '2025-12-14 10:37:42', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.07, \"old\": \"2.07\"}, \"kg_dzn\": {\"new\": 1, \"old\": \"1.00\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2.6, \"old\": \"2.60\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 58.33, \"old\": \"58.33\"}, \"total_kg\": {\"new\": 125, \"old\": \"125.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(90, 18, 'doller2', 'sales_orders', 'UPDATE', 33, 'Updated sales order', '2025-12-14 10:38:02', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.07, \"old\": \"2.07\"}, \"kg_dzn\": {\"new\": 1, \"old\": \"1.00\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2.6, \"old\": \"2.60\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 58.33, \"old\": \"58.33\"}, \"total_kg\": {\"new\": 125, \"old\": \"125.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(91, 18, 'doller2', 'sales_orders', 'DELETE', 33, 'Deleted sales order', '2025-12-14 10:38:08', NULL),
+(92, 18, 'doller2', 'sales_orders', 'CREATE', 35, 'Created sales order', '2025-12-14 10:38:42', NULL),
+(93, 18, 'doller2', 'sales_orders', 'CREATE', 36, 'Created sales order', '2025-12-14 10:39:27', NULL),
+(94, 18, 'doller2', 'sales_orders', 'CREATE', 37, 'Created sales order', '2025-12-14 10:40:25', NULL),
+(95, 18, 'doller2', 'sales_orders', 'UPDATE', 37, 'Updated sales order', '2025-12-14 10:40:32', '{\"note\": {\"new\": \"\", \"old\": null}, \"po_vr\": {\"new\": \"\", \"old\": null}, \"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 760, \"old\": \"760.00\"}, \"rate_pcs\": {\"new\": 304, \"old\": \"304.00\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 0, \"old\": null}, \"order_date\": {\"old\": \"2025-12-14\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(96, 18, 'doller2', 'sales_orders', 'UPDATE', 37, 'Updated sales order', '2025-12-14 10:40:45', '{\"scrap\": {\"new\": 0, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 140, \"old\": \"760.00\"}, \"rate_pcs\": {\"new\": 56, \"old\": \"304.00\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(97, 18, 'doller2', 'sales_orders', 'DELETE', 37, 'Deleted sales order', '2025-12-14 10:40:58', NULL),
+(98, 18, 'doller2', 'sales_orders', 'CREATE', 38, 'Created sales order', '2025-12-14 10:41:16', NULL),
+(99, 18, 'doller2', 'sales_orders', 'UPDATE', 38, 'Updated sales order', '2025-12-14 10:42:03', '{\"note\": {\"new\": \"\", \"old\": null}, \"po_vr\": {\"new\": \"\", \"old\": null}, \"scrap\": {\"new\": 0, \"old\": null}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2.4, \"old\": \"2.40\"}, \"rate_kz\": {\"new\": 140, \"old\": \"140.00\"}, \"rate_pcs\": {\"new\": 56, \"old\": \"56.00\"}, \"total_kg\": {\"new\": 96, \"old\": \"96.00\"}, \"stock_qty\": {\"new\": 0, \"old\": null}, \"order_date\": {\"old\": \"2025-12-14\"}, \"customer_name\": {\"new\": \"\", \"old\": null}, \"manufacturer_name\": {\"new\": \"\", \"old\": null}}'),
+(100, 18, 'doller2', 'sales_orders', 'UPDATE', 38, 'Updated sales order', '2025-12-14 10:42:09', '{\"scrap\": {\"new\": 0, \"old\": \"0.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2.4, \"old\": \"2.40\"}, \"rate_kz\": {\"new\": 140, \"old\": \"140.00\"}, \"rate_pcs\": {\"new\": 56, \"old\": \"56.00\"}, \"total_kg\": {\"new\": 96, \"old\": \"96.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(101, 18, 'doller2', 'sales_orders', 'UPDATE', 38, 'Updated sales order', '2025-12-14 10:43:21', '{\"scrap\": {\"new\": 620, \"old\": \"0.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2.4, \"old\": \"2.40\"}, \"rate_kz\": {\"new\": 760, \"old\": \"140.00\"}, \"rate_pcs\": {\"new\": 304, \"old\": \"56.00\"}, \"total_kg\": {\"new\": 96, \"old\": \"96.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"order_number\": {\"new\": 2, \"old\": 1}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(102, 18, 'doller2', 'sales_orders', 'UPDATE', 38, 'Updated sales order', '2025-12-14 10:43:34', '{\"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2.4, \"old\": \"2.40\"}, \"rate_kz\": {\"new\": 760, \"old\": \"760.00\"}, \"rate_pcs\": {\"new\": 304, \"old\": \"304.00\"}, \"total_kg\": {\"new\": 96, \"old\": \"96.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(103, 18, 'doller2', 'sales_orders', 'UPDATE', 38, 'Updated sales order (batch)', '2025-12-14 10:43:59', '{\"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2.4, \"old\": \"2.40\"}, \"rate_kz\": {\"new\": 760, \"old\": \"760.00\"}, \"rate_pcs\": {\"new\": 304, \"old\": \"304.00\"}, \"total_kg\": {\"new\": 96, \"old\": \"96.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(104, 18, 'doller2', 'sales_orders', 'UPDATE', 38, 'Updated sales order', '2025-12-14 10:44:09', '{\"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 140, \"old\": \"140.00\"}, \"qty_ctn\": {\"new\": 2.4, \"old\": \"2.40\"}, \"rate_kz\": {\"new\": 760, \"old\": \"760.00\"}, \"rate_pcs\": {\"new\": 304, \"old\": \"304.00\"}, \"total_kg\": {\"new\": 96, \"old\": \"96.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(105, 18, 'doller2', 'sales_orders', 'DELETE', 38, 'Deleted sales order', '2025-12-14 10:44:21', NULL),
+(106, 18, 'doller2', 'sales_orders', 'CREATE', 39, 'Created sales order', '2025-12-14 10:46:30', NULL),
+(107, 18, 'doller2', 'sales_orders', 'DELETE', 39, 'Deleted sales order', '2025-12-14 10:52:01', NULL),
+(108, 18, 'doller2', 'sales_orders', 'CREATE', 40, 'Created sales order', '2025-12-14 10:52:27', NULL),
+(109, 18, 'doller2', 'sales_orders', 'CREATE', 41, 'Created sales order', '2025-12-14 10:53:56', NULL),
+(110, 18, 'doller2', 'sales_orders', 'CREATE', 42, 'Created sales order', '2025-12-14 10:54:24', NULL),
+(111, 18, 'doller2', 'sales_orders', 'CREATE', 43, 'Created sales order', '2025-12-14 10:54:51', NULL),
+(112, 18, 'doller2', 'sales_orders', 'CREATE', 44, 'Created sales order', '2025-12-14 10:55:18', NULL),
+(113, 18, 'doller2', 'sales_orders', 'DELETE', 44, 'Deleted sales order', '2025-12-14 10:55:26', NULL),
+(114, 18, 'doller2', 'master_items', 'UPDATE', 13, 'Updated master item', '2025-12-14 10:55:40', '{\"kg_dz\": {\"new\": 3.4, \"old\": \"3.40\"}, \"item_code\": {\"new\": \"S5118532H//3.400\", \"old\": \"S5118532H\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(115, 18, 'doller2', 'inventory_items', 'UPDATE', 82, 'Updated inventory item', '2025-12-14 10:56:25', '{\"scrap\": {\"new\": 0, \"old\": \"0.00\"}, \"finish\": {\"new\": \"\", \"old\": null}, \"kg_box\": {\"new\": 1.46, \"old\": \"1.46\"}, \"kg_dzn\": {\"new\": 3.4, \"old\": \"3.40\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"rate_kg\": {\"new\": 100, \"old\": \"100.00\"}, \"empty_wt\": {\"new\": 0.05, \"old\": \"0.05\"}, \"rate_pcs\": {\"new\": 28.33, \"old\": \"28.33\"}, \"total_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_wt\": {\"new\": 0.04, \"old\": \"0.04\"}, \"item_code\": {\"new\": \"S5118532H//3.400\", \"old\": \"S5118532H\"}, \"actual_net_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(116, 18, 'doller2', 'inventory_items', 'UPDATE', 75, 'Updated inventory item', '2025-12-14 10:56:30', '{\"scrap\": {\"new\": 0, \"old\": \"0.00\"}, \"kg_box\": {\"new\": 0, \"old\": \"0.00\"}, \"kg_dzn\": {\"new\": 3.4, \"old\": \"3.40\"}, \"labour\": {\"new\": 50, \"old\": \"50.00\"}, \"rate_kg\": {\"new\": 50, \"old\": \"50.00\"}, \"empty_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"rate_pcs\": {\"new\": 14.17, \"old\": \"14.17\"}, \"total_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"item_code\": {\"new\": \"S5118532H//3.400\", \"old\": \"S5118532H\"}, \"actual_net_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(117, 18, 'doller2', 'inventory_items', 'UPDATE', 67, 'Updated inventory item', '2025-12-14 10:56:36', '{\"scrap\": {\"new\": 0, \"old\": \"0.00\"}, \"finish\": {\"new\": \"\", \"old\": null}, \"kg_box\": {\"new\": 0, \"old\": \"0.00\"}, \"kg_dzn\": {\"new\": 3.4, \"old\": \"3.40\"}, \"labour\": {\"new\": 60, \"old\": \"60.00\"}, \"rate_kg\": {\"new\": 60, \"old\": \"60.00\"}, \"empty_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"rate_pcs\": {\"new\": 17, \"old\": \"17.00\"}, \"total_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"actual_wt\": {\"new\": 0, \"old\": \"0.00\"}, \"item_code\": {\"new\": \"S5118532H//3.400\", \"old\": \"S5118532H\"}, \"actual_net_kg\": {\"new\": 0, \"old\": \"0.00\"}, \"stock_quantity\": {\"new\": 0, \"old\": \"0.00\"}}'),
+(118, 18, 'doller2', 'sales_orders', 'CREATE', 45, 'Created sales order', '2025-12-14 10:57:42', NULL),
+(119, 18, 'doller2', 'sales_orders', 'DELETE', 45, 'Deleted sales order', '2025-12-14 10:57:51', NULL),
+(120, 18, 'doller2', 'purchase_invoices', 'CREATE', 1, 'Created purchase invoice 12-003', '2025-12-14 11:01:38', NULL),
+(121, 18, 'doller2', 'purchase_invoices', 'CREATE', 2, 'Created purchase invoice 12-009', '2025-12-14 11:04:03', NULL),
+(122, 18, 'doller2', 'purchase_invoices', 'CREATE', 3, 'Created purchase invoice 12=006', '2025-12-14 11:06:25', NULL),
+(123, 18, 'doller2', 'purchase_invoices', 'UPDATE', 3, 'Updated purchase invoice', '2025-12-14 11:06:36', '{\"user\": {\"new\": \"DEEP\", \"old\": \"AKSH\"}, \"due_date\": {\"new\": \"2025-12-15\", \"old\": \"2025-12-15T00:00:00.000Z\"}}'),
+(124, 18, 'doller2', 'purchase_invoices', 'UPDATE', 3, 'Updated purchase invoice', '2025-12-14 11:07:28', '{\"due_date\": {\"new\": \"2025-12-15\", \"old\": \"2025-12-15T00:00:00.000Z\"}, \"invoice_number\": {\"new\": \"12006\", \"old\": \"12=006\"}}'),
+(125, 18, 'doller2', 'purchase_invoices', 'UPDATE', 3, 'Updated purchase invoice', '2025-12-14 11:07:58', '{\"due_date\": {\"new\": \"2025-12-15\", \"old\": \"2025-12-15T00:00:00.000Z\"}}'),
+(126, 18, 'doller2', 'sales_orders', 'UPDATE', 43, 'Updated sales order', '2025-12-14 11:38:12', '{\"note\": {\"new\": \"\", \"old\": null}, \"po_vr\": {\"new\": \"\", \"old\": null}, \"scrap\": {\"new\": 608, \"old\": \"608.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 708, \"old\": \"708.00\"}, \"rate_pcs\": {\"new\": 283.2, \"old\": \"283.20\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 0, \"old\": null}, \"order_date\": {\"old\": \"2025-12-14\"}, \"customer_name\": {\"new\": \"\", \"old\": null}, \"manufacturer_name\": {\"new\": \"TISA\", \"old\": null}}'),
+(127, 18, 'doller2', 'sales_orders', 'DELETE', 43, 'Deleted sales order (batch)', '2025-12-14 11:38:27', NULL),
+(128, 18, 'doller2', 'sales_orders', 'DELETE', 42, 'Deleted sales order (batch)', '2025-12-14 11:38:27', NULL),
+(129, 18, 'doller2', 'sales_orders', 'DELETE', 41, 'Deleted sales order (batch)', '2025-12-14 11:38:27', NULL),
+(130, 18, 'doller2', 'sales_orders', 'CREATE', 46, 'Created sales order', '2025-12-14 11:38:45', NULL),
+(131, 18, 'doller2', 'sales_orders', 'DELETE', 46, 'Deleted sales order', '2025-12-14 11:39:08', NULL),
+(132, 18, 'doller2', 'sales_orders', 'CREATE', 47, 'Created sales order', '2025-12-14 11:40:04', NULL),
+(133, 18, 'doller2', 'sales_orders', 'CREATE', 48, 'Created sales order', '2025-12-14 11:40:31', NULL),
+(134, 18, 'doller2', 'sales_orders', 'CREATE', 49, 'Created sales order', '2025-12-14 11:41:01', NULL),
+(135, 18, 'doller2', 'contacts', 'CREATE', 69, 'Created contact', '2025-12-14 11:57:09', NULL),
+(136, 18, 'doller2', 'master_items', 'CREATE', 21, 'Created master item', '2025-12-14 11:58:08', NULL),
+(137, 18, 'doller2', 'inventory_items', 'CREATE', 85, 'Created inventory item', '2025-12-14 11:59:04', NULL),
+(138, 18, 'doller2', 'order_stock', 'CREATE', 4, 'Created order stock', '2025-12-14 12:00:57', NULL),
+(139, 18, 'doller2', 'order_stock', 'CREATE', 5, 'Created order stock', '2025-12-14 12:00:57', NULL),
+(140, 18, 'doller2', 'order_stock', 'CREATE', 6, 'Created order stock', '2025-12-14 12:00:57', NULL),
+(141, 18, 'doller2', 'order_stock', 'CREATE', 7, 'Created order stock', '2025-12-14 12:00:57', NULL),
+(142, 18, 'doller2', 'order_stock', 'DELETE', 5, 'Deleted order stock', '2025-12-14 12:01:01', NULL),
+(143, 18, 'doller2', 'order_stock', 'DELETE', 6, 'Deleted order stock', '2025-12-14 12:01:04', NULL),
+(144, 18, 'doller2', 'order_stock', 'UPDATE', 7, 'Updated order stock', '2025-12-14 12:01:11', '{\"order_stock\": {\"new\": \"STOCK\", \"old\": \"PLAN\"}}'),
+(145, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-14 14:56:35', NULL),
+(146, 18, 'doller2', 'sales_orders', 'UPDATE', 34, 'Updated sales order', '2025-12-14 15:01:49', '{\"note\": {\"new\": \"\", \"old\": null}, \"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.28, \"old\": \"2.28\"}, \"kg_dzn\": {\"new\": 1.1, \"old\": \"1.10\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 3.33, \"old\": \"3.33\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 64.17, \"old\": \"64.17\"}, \"total_kg\": {\"new\": 110, \"old\": \"110.00\"}, \"stock_qty\": {\"new\": 0, \"old\": null}, \"order_date\": {\"old\": \"2025-12-01\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(147, 18, 'doller2', 'sales_orders', 'UPDATE', 34, 'Updated sales order', '2025-12-14 15:02:30', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.28, \"old\": \"2.28\"}, \"kg_dzn\": {\"new\": 1.1, \"old\": \"1.10\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 3.33, \"old\": \"3.33\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 64.17, \"old\": \"64.17\"}, \"total_kg\": {\"new\": 110, \"old\": \"110.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(148, 18, 'doller2', 'sales_orders', 'UPDATE', 49, 'Updated sales order', '2025-12-14 15:52:46', '{\"note\": {\"new\": \"\", \"old\": null}, \"po_vr\": {\"new\": \"\", \"old\": null}, \"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"finish\": {\"new\": \"\", \"old\": null}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 720, \"old\": \"720.00\"}, \"rate_pcs\": {\"new\": 288, \"old\": \"288.00\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 485.11, \"old\": \"485.11\"}, \"order_date\": {\"old\": \"2025-12-14\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(149, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-14 18:05:53', NULL),
+(150, 18, 'doller2', 'employees', 'UPDATE', 9, 'Updated employee ID: 9', '2025-12-14 18:12:21', NULL),
+(151, 18, 'doller2', 'sales_orders', 'UPDATE', 49, 'Updated sales order', '2025-12-14 18:26:34', '{\"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 720, \"old\": \"720.00\"}, \"rate_pcs\": {\"new\": 288, \"old\": \"288.00\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 485.11, \"old\": \"485.11\"}, \"order_date\": {\"new\": \"2025-12-14\", \"old\": null}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(152, 18, 'doller2', 'sales_orders', 'UPDATE', 49, 'Updated sales order', '2025-12-14 18:48:13', '{\"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 720, \"old\": \"720.00\"}, \"rate_pcs\": {\"new\": 288, \"old\": \"288.00\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 485.11, \"old\": \"485.11\"}, \"order_date\": {\"new\": \"2025-12-13\", \"old\": \"2025-12-14\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(153, 18, 'doller2', 'sales_orders', 'UPDATE', 49, 'Updated sales order', '2025-12-14 18:48:23', '{\"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 720, \"old\": \"720.00\"}, \"rate_pcs\": {\"new\": 288, \"old\": \"288.00\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 485.11, \"old\": \"485.11\"}, \"order_date\": {\"new\": \"2025-12-14\", \"old\": \"2025-12-13\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(154, 18, 'doller2', 'users', 'LOGIN', 18, 'User doller2 logged in', '2025-12-15 09:38:22', NULL),
+(155, 18, 'doller2', 'carton_inventory', 'CREATE', 5, 'Created carton CTN', '2025-12-15 09:41:02', NULL),
+(156, 18, 'doller2', 'sales_orders', 'UPDATE', 49, 'Updated sales order', '2025-12-15 09:47:46', '{\"scrap\": {\"new\": 620, \"old\": \"620.00\"}, \"finish\": {\"new\": \"SS\", \"old\": \"\"}, \"kg_box\": {\"new\": 2.05, \"old\": \"2.05\"}, \"kg_dzn\": {\"new\": 4.8, \"old\": \"4.80\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 2, \"old\": \"2.00\"}, \"rate_kz\": {\"new\": 720, \"old\": \"720.00\"}, \"rate_pcs\": {\"new\": 288, \"old\": \"288.00\"}, \"total_kg\": {\"new\": 80, \"old\": \"80.00\"}, \"stock_qty\": {\"new\": 485.11, \"old\": \"485.11\"}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(157, 18, 'doller2', 'sales_orders', 'UPDATE', 34, 'Updated sales order', '2025-12-15 09:48:04', '{\"scrap\": {\"new\": 600, \"old\": \"600.00\"}, \"kg_box\": {\"new\": 2.28, \"old\": \"2.28\"}, \"kg_dzn\": {\"new\": 1.1, \"old\": \"1.10\"}, \"labour\": {\"new\": 100, \"old\": \"100.00\"}, \"qty_ctn\": {\"new\": 3.33, \"old\": \"3.33\"}, \"rate_kz\": {\"new\": 700, \"old\": \"700.00\"}, \"rate_pcs\": {\"new\": 64.17, \"old\": \"64.17\"}, \"total_kg\": {\"new\": 110, \"old\": \"110.00\"}, \"stock_qty\": {\"new\": 0, \"old\": \"0.00\"}, \"order_date\": {\"new\": \"2025-12-14\", \"old\": null}, \"customer_name\": {\"new\": \"\", \"old\": null}}'),
+(158, 18, 'doller2', 'invoices', 'CREATE', 64, 'Created invoice 6565', '2025-12-15 09:56:06', NULL),
+(159, 18, 'doller2', 'employee_advances', 'CREATE', 1, 'Created advance payment of ₹500 for employee: ASAD', '2025-12-16 19:20:18', NULL),
+(160, 18, 'doller2', 'employee_advance_repayments', 'CREATE', 2147483647, 'Added repayment of ₹200 for employee: ASAD', '2025-12-16 19:34:45', NULL),
+(161, 18, 'doller2', 'employee_advances', 'CREATE', 2, 'Created advance payment of ₹500 for employee: ASAD', '2025-12-16 19:49:08', NULL),
+(162, 18, 'doller2', 'employee_advance_repayments', 'CREATE', 2147483647, 'Added repayment of ₹150 for employee: ASAD', '2025-12-16 19:49:19', NULL),
+(163, 18, 'doller2', 'invoices', 'CREATE', 65, 'Created invoice inv0123', '2025-12-16 19:53:46', NULL);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `user_permissions`
+--
+
+CREATE TABLE `user_permissions` (
+  `id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `permission_name` varchar(50) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `user_permissions`
+--
+
+INSERT INTO `user_permissions` (`id`, `user_id`, `permission_name`) VALUES
+(172, 1, 'employee_management'),
+(175, 1, 'journal_entries'),
+(1, 6, 'receipts'),
+(3, 7, 'accounts'),
+(6, 7, 'contacts'),
+(7, 7, 'customers'),
+(2, 7, 'dashboard'),
+(13, 7, 'employees'),
+(12, 7, 'inventory_items'),
+(14, 7, 'journal_entries'),
+(5, 7, 'payments'),
+(11, 7, 'purchase_invoices'),
+(4, 7, 'receipts'),
+(15, 7, 'reports'),
+(10, 7, 'sales_invoices'),
+(9, 7, 'sales_orders'),
+(8, 7, 'suppliers'),
+(17, 8, 'accounts'),
+(20, 8, 'contacts'),
+(21, 8, 'customers'),
+(30, 8, 'custom_items'),
+(16, 8, 'dashboard'),
+(27, 8, 'employees'),
+(26, 8, 'inventory_items'),
+(28, 8, 'journal_entries'),
+(19, 8, 'payments'),
+(25, 8, 'purchase_invoices'),
+(18, 8, 'receipts'),
+(29, 8, 'reports'),
+(24, 8, 'sales_invoices'),
+(23, 8, 'sales_orders'),
+(22, 8, 'suppliers'),
+(32, 9, 'accounts'),
+(35, 9, 'contacts'),
+(36, 9, 'customers'),
+(31, 9, 'dashboard'),
+(42, 9, 'employees'),
+(41, 9, 'inventory_items'),
+(43, 9, 'journal_entries'),
+(45, 9, 'master_items'),
+(34, 9, 'payments'),
+(40, 9, 'purchase_invoices'),
+(33, 9, 'receipts'),
+(44, 9, 'reports'),
+(39, 9, 'sales_invoices'),
+(38, 9, 'sales_orders'),
+(37, 9, 'suppliers'),
+(111, 15, 'accounts'),
+(114, 15, 'contacts'),
+(110, 15, 'create_user'),
+(115, 15, 'customers'),
+(121, 15, 'employees'),
+(120, 15, 'inventory_items'),
+(122, 15, 'journal_entries'),
+(124, 15, 'master_items'),
+(113, 15, 'payments'),
+(119, 15, 'purchase_invoices'),
+(112, 15, 'receipts'),
+(123, 15, 'reports'),
+(118, 15, 'sales_invoices'),
+(117, 15, 'sales_orders'),
+(116, 15, 'suppliers'),
+(126, 17, 'accounts'),
+(129, 17, 'contacts'),
+(130, 17, 'customers'),
+(125, 17, 'dashboard'),
+(136, 17, 'employees'),
+(135, 17, 'inventory_items'),
+(137, 17, 'journal_entries'),
+(139, 17, 'master_items'),
+(128, 17, 'payments'),
+(134, 17, 'purchase_invoices'),
+(127, 17, 'receipts'),
+(138, 17, 'reports'),
+(133, 17, 'sales_invoices'),
+(132, 17, 'sales_orders'),
+(131, 17, 'suppliers'),
+(141, 18, 'accounts'),
+(155, 18, 'contacts'),
+(152, 18, 'create_user'),
+(144, 18, 'customers'),
+(140, 18, 'dashboard'),
+(151, 18, 'employees'),
+(174, 18, 'employee_management'),
+(149, 18, 'inventory_items'),
+(153, 18, 'journal_entries'),
+(150, 18, 'master_items'),
+(143, 18, 'payments'),
+(148, 18, 'purchase_invoices'),
+(142, 18, 'receipts'),
+(154, 18, 'reports'),
+(147, 18, 'sales_invoices'),
+(146, 18, 'sales_orders'),
+(145, 18, 'suppliers'),
+(157, 19, 'accounts'),
+(171, 19, 'contacts'),
+(168, 19, 'create_user'),
+(160, 19, 'customers'),
+(156, 19, 'dashboard'),
+(167, 19, 'employees'),
+(165, 19, 'inventory_items'),
+(169, 19, 'journal_entries'),
+(166, 19, 'master_items'),
+(159, 19, 'payments'),
+(164, 19, 'purchase_invoices'),
+(158, 19, 'receipts'),
+(170, 19, 'reports'),
+(163, 19, 'sales_invoices'),
+(162, 19, 'sales_orders'),
+(161, 19, 'suppliers');
+
+-- --------------------------------------------------------
+
+--
+-- Structure for view `employee_advance_summary`
+--
+DROP TABLE IF EXISTS `employee_advance_summary`;
+
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `employee_advance_summary`  AS SELECT `e`.`id` AS `employee_id`, `e`.`name` AS `employee_name`, count(distinct `ea`.`id`) AS `total_advances`, coalesce(sum(case when `ea`.`status` = 'PENDING' then `ea`.`amount` else 0 end),0) AS `pending_amount`, coalesce(sum(case when `ea`.`status` in ('PENDING','PARTIAL') then `ea`.`remaining_balance` else 0 end),0) AS `total_remaining_balance`, coalesce(sum(`ear`.`amount`),0) AS `total_repaid` FROM ((`employees` `e` left join `employee_advances` `ea` on(`e`.`id` = `ea`.`employee_id`)) left join `employee_advance_repayments` `ear` on(`ea`.`id` = `ear`.`advance_id`)) GROUP BY `e`.`id`, `e`.`name` ;
+
+--
+-- Indexes for dumped tables
+--
+
+--
+-- Indexes for table `accounts`
+--
+ALTER TABLE `accounts`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `code` (`code`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Indexes for table `account_history`
+--
+ALTER TABLE `account_history`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_account_id` (`account_id`),
+  ADD KEY `idx_contact_id` (`contact_id`),
+  ADD KEY `idx_date` (`date`),
+  ADD KEY `idx_transaction_type` (`transaction_type`),
+  ADD KEY `idx_receipt_id` (`receipt_id`),
+  ADD KEY `idx_payment_id` (`payment_id`),
+  ADD KEY `idx_account_date` (`account_id`,`date`),
+  ADD KEY `idx_account_type` (`account_id`,`transaction_type`);
+
+--
+-- Indexes for table `carton_inventory`
+--
+ALTER TABLE `carton_inventory`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `carton_name` (`carton_name`);
+
+--
+-- Indexes for table `contacts`
+--
+ALTER TABLE `contacts`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `code` (`code`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Indexes for table `customer_details`
+--
+ALTER TABLE `customer_details`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `contact_id` (`contact_id`),
+  ADD UNIQUE KEY `contact_id_2` (`contact_id`);
+
+--
+-- Indexes for table `employees`
+--
+ALTER TABLE `employees`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `mobile` (`mobile`);
+
+--
+-- Indexes for table `employee_advances`
+--
+ALTER TABLE `employee_advances`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_employee_id` (`employee_id`),
+  ADD KEY `idx_date` (`date`),
+  ADD KEY `idx_status` (`status`),
+  ADD KEY `idx_employee_status` (`employee_id`,`status`),
+  ADD KEY `idx_advance_date` (`employee_id`,`date`);
+
+--
+-- Indexes for table `employee_advance_repayments`
+--
+ALTER TABLE `employee_advance_repayments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_advance_id` (`advance_id`),
+  ADD KEY `idx_employee_id` (`employee_id`),
+  ADD KEY `idx_date` (`date`);
+
+--
+-- Indexes for table `employee_weekly_salary`
+--
+ALTER TABLE `employee_weekly_salary`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_employee_week` (`employee_id`,`week_start_date`),
+  ADD KEY `idx_week_dates` (`week_start_date`,`week_end_date`),
+  ADD KEY `idx_employee_week` (`employee_id`,`week_start_date`);
+
+--
+-- Indexes for table `employee_work_records`
+--
+ALTER TABLE `employee_work_records`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_employee_date` (`employee_id`,`work_date`);
+
+--
+-- Indexes for table `finishes_table`
+--
+ALTER TABLE `finishes_table`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `inventory_items`
+--
+ALTER TABLE `inventory_items`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `code_user` (`code_user`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Indexes for table `invoices`
+--
+ALTER TABLE `invoices`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `invoice_number` (`invoice_number`),
+  ADD KEY `customer_id` (`customer_id`);
+
+--
+-- Indexes for table `invoice_items`
+--
+ALTER TABLE `invoice_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `invoice_id` (`invoice_id`);
+
+--
+-- Indexes for table `journal_customers`
+--
+ALTER TABLE `journal_customers`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `journal_entries`
+--
+ALTER TABLE `journal_entries`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `method_id` (`method_id`),
+  ADD KEY `user_id` (`user_id`),
+  ADD KEY `idx_date` (`date`),
+  ADD KEY `idx_type` (`type`),
+  ADD KEY `idx_customer` (`customer_name`);
+
+--
+-- Indexes for table `master_items`
+--
+ALTER TABLE `master_items`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `item_code` (`item_code`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Indexes for table `order_stock`
+--
+ALTER TABLE `order_stock`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `pati_table`
+--
+ALTER TABLE `pati_table`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `payments`
+--
+ALTER TABLE `payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `account_id` (`account_id`),
+  ADD KEY `contact_id` (`contact_id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `payment_methods`
+--
+ALTER TABLE `payment_methods`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `purchase_invoices`
+--
+ALTER TABLE `purchase_invoices`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `purchase_invoice_items`
+--
+ALTER TABLE `purchase_invoice_items`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `invoice_id` (`invoice_id`);
+
+--
+-- Indexes for table `receipts`
+--
+ALTER TABLE `receipts`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `contact_id` (`contact_id`),
+  ADD KEY `account_id` (`account_id`),
+  ADD KEY `user_id` (`user_id`);
+
+--
+-- Indexes for table `sales_invoice`
+--
+ALTER TABLE `sales_invoice`
+  ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `sales_orders`
+--
+ALTER TABLE `sales_orders`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `created_by` (`created_by`);
+
+--
+-- Indexes for table `shipping_cartons`
+--
+ALTER TABLE `shipping_cartons`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `invoice_id` (`invoice_id`);
+
+--
+-- Indexes for table `stock_history`
+--
+ALTER TABLE `stock_history`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_item_code` (`item_code`),
+  ADD KEY `idx_movement_date` (`movement_date`),
+  ADD KEY `idx_invoice_number` (`invoice_number`),
+  ADD KEY `idx_transaction_type` (`transaction_type`),
+  ADD KEY `idx_invoice_type` (`invoice_type`);
+
+--
+-- Indexes for table `supplier_details`
+--
+ALTER TABLE `supplier_details`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `contact_id` (`contact_id`),
+  ADD UNIQUE KEY `contact_id_2` (`contact_id`);
+
+--
+-- Indexes for table `transport`
+--
+ALTER TABLE `transport`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `name` (`name`);
+
+--
+-- Indexes for table `users`
+--
+ALTER TABLE `users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `user_name` (`user_name`),
+  ADD UNIQUE KEY `email` (`email`);
+
+--
+-- Indexes for table `user_activity`
+--
+ALTER TABLE `user_activity`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_user_id` (`user_id`),
+  ADD KEY `idx_model_name` (`model_name`),
+  ADD KEY `idx_action_type` (`action_type`),
+  ADD KEY `idx_created_at` (`created_at`);
+
+--
+-- Indexes for table `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `user_id` (`user_id`,`permission_name`);
+
+--
+-- AUTO_INCREMENT for dumped tables
+--
+
+--
+-- AUTO_INCREMENT for table `accounts`
+--
+ALTER TABLE `accounts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `account_history`
+--
+ALTER TABLE `account_history`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `carton_inventory`
+--
+ALTER TABLE `carton_inventory`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT for table `contacts`
+--
+ALTER TABLE `contacts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=70;
+
+--
+-- AUTO_INCREMENT for table `customer_details`
+--
+ALTER TABLE `customer_details`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
+
+--
+-- AUTO_INCREMENT for table `employees`
+--
+ALTER TABLE `employees`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+
+--
+-- AUTO_INCREMENT for table `employee_advances`
+--
+ALTER TABLE `employee_advances`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `employee_advance_repayments`
+--
+ALTER TABLE `employee_advance_repayments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `employee_weekly_salary`
+--
+ALTER TABLE `employee_weekly_salary`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=19;
+
+--
+-- AUTO_INCREMENT for table `employee_work_records`
+--
+ALTER TABLE `employee_work_records`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=52;
+
+--
+-- AUTO_INCREMENT for table `finishes_table`
+--
+ALTER TABLE `finishes_table`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+
+--
+-- AUTO_INCREMENT for table `inventory_items`
+--
+ALTER TABLE `inventory_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=86;
+
+--
+-- AUTO_INCREMENT for table `invoices`
+--
+ALTER TABLE `invoices`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
+
+--
+-- AUTO_INCREMENT for table `invoice_items`
+--
+ALTER TABLE `invoice_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=94;
+
+--
+-- AUTO_INCREMENT for table `journal_customers`
+--
+ALTER TABLE `journal_customers`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `journal_entries`
+--
+ALTER TABLE `journal_entries`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+
+--
+-- AUTO_INCREMENT for table `master_items`
+--
+ALTER TABLE `master_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+
+--
+-- AUTO_INCREMENT for table `order_stock`
+--
+ALTER TABLE `order_stock`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `pati_table`
+--
+ALTER TABLE `pati_table`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `payments`
+--
+ALTER TABLE `payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `payment_methods`
+--
+ALTER TABLE `payment_methods`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `purchase_invoices`
+--
+ALTER TABLE `purchase_invoices`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `purchase_invoice_items`
+--
+ALTER TABLE `purchase_invoice_items`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
+-- AUTO_INCREMENT for table `receipts`
+--
+ALTER TABLE `receipts`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+
+--
+-- AUTO_INCREMENT for table `sales_invoice`
+--
+ALTER TABLE `sales_invoice`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sales_orders`
+--
+ALTER TABLE `sales_orders`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
+
+--
+-- AUTO_INCREMENT for table `shipping_cartons`
+--
+ALTER TABLE `shipping_cartons`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+
+--
+-- AUTO_INCREMENT for table `stock_history`
+--
+ALTER TABLE `stock_history`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `supplier_details`
+--
+ALTER TABLE `supplier_details`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=34;
+
+--
+-- AUTO_INCREMENT for table `transport`
+--
+ALTER TABLE `transport`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `users`
+--
+ALTER TABLE `users`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=20;
+
+--
+-- AUTO_INCREMENT for table `user_activity`
+--
+ALTER TABLE `user_activity`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=164;
+
+--
+-- AUTO_INCREMENT for table `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=177;
+
+--
+-- Constraints for dumped tables
+--
+
+--
+-- Constraints for table `accounts`
+--
+ALTER TABLE `accounts`
+  ADD CONSTRAINT `accounts_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `account_history`
+--
+ALTER TABLE `account_history`
+  ADD CONSTRAINT `fk_account_history_account` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `fk_account_history_contact` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_account_history_payment` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_account_history_receipt` FOREIGN KEY (`receipt_id`) REFERENCES `receipts` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `contacts`
+--
+ALTER TABLE `contacts`
+  ADD CONSTRAINT `contacts_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `customer_details`
+--
+ALTER TABLE `customer_details`
+  ADD CONSTRAINT `customer_details_ibfk_1` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `employee_advances`
+--
+ALTER TABLE `employee_advances`
+  ADD CONSTRAINT `employee_advances_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `employee_advance_repayments`
+--
+ALTER TABLE `employee_advance_repayments`
+  ADD CONSTRAINT `employee_advance_repayments_ibfk_1` FOREIGN KEY (`advance_id`) REFERENCES `employee_advances` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `employee_advance_repayments_ibfk_2` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `employee_weekly_salary`
+--
+ALTER TABLE `employee_weekly_salary`
+  ADD CONSTRAINT `employee_weekly_salary_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `employee_work_records`
+--
+ALTER TABLE `employee_work_records`
+  ADD CONSTRAINT `employee_work_records_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `employees` (`id`);
+
+--
+-- Constraints for table `invoice_items`
+--
+ALTER TABLE `invoice_items`
+  ADD CONSTRAINT `invoice_items_ibfk_1` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `journal_entries`
+--
+ALTER TABLE `journal_entries`
+  ADD CONSTRAINT `journal_entries_ibfk_1` FOREIGN KEY (`method_id`) REFERENCES `payment_methods` (`id`),
+  ADD CONSTRAINT `journal_entries_ibfk_2` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `master_items`
+--
+ALTER TABLE `master_items`
+  ADD CONSTRAINT `master_items_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `payments`
+--
+ALTER TABLE `payments`
+  ADD CONSTRAINT `payments_ibfk_1` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `payments_ibfk_2` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `payments_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `purchase_invoice_items`
+--
+ALTER TABLE `purchase_invoice_items`
+  ADD CONSTRAINT `purchase_invoice_items_ibfk_1` FOREIGN KEY (`invoice_id`) REFERENCES `purchase_invoices` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `receipts`
+--
+ALTER TABLE `receipts`
+  ADD CONSTRAINT `receipts_ibfk_1` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `receipts_ibfk_2` FOREIGN KEY (`account_id`) REFERENCES `accounts` (`id`) ON DELETE CASCADE,
+  ADD CONSTRAINT `receipts_ibfk_3` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `sales_orders`
+--
+ALTER TABLE `sales_orders`
+  ADD CONSTRAINT `sales_orders_ibfk_2` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`);
+
+--
+-- Constraints for table `shipping_cartons`
+--
+ALTER TABLE `shipping_cartons`
+  ADD CONSTRAINT `shipping_cartons_ibfk_1` FOREIGN KEY (`invoice_id`) REFERENCES `invoices` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `stock_history`
+--
+ALTER TABLE `stock_history`
+  ADD CONSTRAINT `fk_stock_history_item` FOREIGN KEY (`item_code`) REFERENCES `master_items` (`item_code`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `supplier_details`
+--
+ALTER TABLE `supplier_details`
+  ADD CONSTRAINT `supplier_details_ibfk_1` FOREIGN KEY (`contact_id`) REFERENCES `contacts` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_activity`
+--
+ALTER TABLE `user_activity`
+  ADD CONSTRAINT `fk_user_activity_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `user_permissions`
+--
+ALTER TABLE `user_permissions`
+  ADD CONSTRAINT `user_permissions_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
+COMMIT;
+
+/*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
+/*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
+/*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
