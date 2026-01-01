@@ -44,19 +44,19 @@ const Contact = {
         const {
           credit_limit, division, due_date, payment_status, note, total_amount,
           // ADD these new fields
-          notes, payment, date, order_follow_up
+          notes, payment, date, order_follow_up, note_date
         } = baseData.details;
 
         // Update the INSERT query
         const supplierQuery = `INSERT INTO supplier_details 
         (contact_id, credit_limit, division, due_date, payment_status, note, total_amount,
-         notes, payment, date, order_follow_up) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+         notes, payment, date, order_follow_up, note_date) 
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
         // Add the new values to the array
         await connection.query(supplierQuery, [
           contactId, credit_limit, division, due_date, payment_status, note, total_amount,
-          notes, payment, date, order_follow_up
+          notes, payment, date, order_follow_up, note_date
         ]);
       }
 
@@ -79,7 +79,7 @@ const Contact = {
             cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
             cd.place_of_supply, cd.reverse_charge, cd.type_of_registration, cd.total_amount,
             cd.notes, cd.payment, cd.date, cd.order_follow_up, cd.no_1, cd.no_2,
-            sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note,
+            sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note, sd.note_date,
             COALESCE(
                 (
                     SELECT DATEDIFF(CURDATE(), i.invoice_date)
@@ -108,7 +108,7 @@ const Contact = {
             cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
             cd.place_of_supply, cd.reverse_charge, cd.type_of_registration, cd.total_amount,
             cd.notes, cd.payment, cd.date, cd.order_follow_up, cd.no_1, cd.no_2,
-            sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note,
+            sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note, sd.note_date,
             COALESCE(
                 (
                     SELECT DATEDIFF(CURDATE(), i.invoice_date)
@@ -186,6 +186,12 @@ const Contact = {
       } else if (type === 'Supplier' && details && Object.keys(details).length > 0) {
         const supplierFields = [];
         const supplierValues = [];
+
+        // Auto-set note_date to current date when note is updated
+        if (details.note !== undefined && !details.note_date) {
+          details.note_date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD format
+        }
+
         for (const [key, value] of Object.entries(details)) {
           supplierFields.push(`${key} = ?`);
           supplierValues.push(value);
@@ -203,7 +209,7 @@ const Contact = {
         `SELECT c.*, cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
      cd.place_of_supply, cd.reverse_charge, cd.type_of_registration, cd.total_amount,
      cd.notes, cd.payment, cd.date, cd.order_follow_up,cd.no_1,cd.no_2,
-     sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note
+     sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note, sd.note_date
      FROM contacts c
      LEFT JOIN customer_details cd ON c.id = cd.contact_id
      LEFT JOIN supplier_details sd ON c.id = sd.contact_id
@@ -310,7 +316,7 @@ const Contact = {
         cd.credit_period, cd.billing_address, cd.delivery_address, cd.gstin, cd.pan, 
         cd.place_of_supply, cd.reverse_charge, cd.type_of_registration, cd.total_amount,
         cd.notes, cd.payment, cd.date, cd.order_follow_up, cd.no_1, cd.no_2,
-        sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note,
+        sd.credit_limit, sd.division, sd.due_date, sd.payment_status, sd.note, sd.note_date,
         COALESCE(
           (
             SELECT DATEDIFF(CURDATE(), i.invoice_date)

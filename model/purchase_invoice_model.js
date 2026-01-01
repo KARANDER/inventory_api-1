@@ -59,7 +59,7 @@ const PurchaseInvoice = {
           // --- END OF NEW LOGIC ---
         }
       }
-      
+
       // Update supplier's total amount if applicable
       if (userCode && invoiceTotal > 0) {
         const [contacts] = await connection.query('SELECT id FROM contacts WHERE code = ?', [userCode]);
@@ -82,53 +82,97 @@ const PurchaseInvoice = {
 
   // REPLACE the old updateWithItems function with this one
 
-updateWithItems: async (invoiceId, invoiceData, lineItems = [], deletedItemIds = []) => {
+  updateWithItems: async (invoiceId, invoiceData, lineItems = [], deletedItemIds = []) => {
     const connection = await db.getConnection();
     try {
-        await connection.beginTransaction();
+      await connection.beginTransaction();
 
-        // Step 1: Update the main invoice details
-        if (Object.keys(invoiceData).length > 0) {
-            await connection.query('UPDATE purchase_invoices SET ? WHERE id = ?', [invoiceData, invoiceId]);
+      // Step 1: Update the main invoice details
+      if (Object.keys(invoiceData).length > 0) {
+        await connection.query('UPDATE purchase_invoices SET ? WHERE id = ?', [invoiceData, invoiceId]);
+      }
+
+      // Step 2: Delete any items that were removed
+      if (deletedItemIds.length > 0) {
+        const deleteQuery = 'DELETE FROM purchase_invoice_items WHERE id IN (?) AND invoice_id = ?';
+        await connection.query(deleteQuery, [deletedItemIds, invoiceId]);
+      }
+
+      // Step 3: Loop through items to ONLY update existing ones
+      for (const item of lineItems) {
+        // This 'if' block remains the same.
+        if (item.id) {
+          // If it has an ID, it's an existing item. UPDATE it.
+          const { id, ...itemData } = item;
+          await connection.query('UPDATE purchase_invoice_items SET ? WHERE id = ? AND invoice_id = ?', [itemData, id, invoiceId]);
         }
+        // --- CHANGE: The 'else' block below has been completely removed. ---
+        // else {
+        //    // If it has no ID, it's a new item. INSERT it.
+        //    item.invoice_id = invoiceId;
+        //    await connection.query('INSERT INTO purchase_invoice_items SET ?', item);
+        // }
+      }
 
-        // Step 2: Delete any items that were removed
-        if (deletedItemIds.length > 0) {
-            const deleteQuery = 'DELETE FROM purchase_invoice_items WHERE id IN (?) AND invoice_id = ?';
-            await connection.query(deleteQuery, [deletedItemIds, invoiceId]);
-        }
-
-        // Step 3: Loop through items to ONLY update existing ones
-        for (const item of lineItems) {
-            // This 'if' block remains the same.
-            if (item.id) {
-                // If it has an ID, it's an existing item. UPDATE it.
-                const { id, ...itemData } = item;
-                await connection.query('UPDATE purchase_invoice_items SET ? WHERE id = ? AND invoice_id = ?', [itemData, id, invoiceId]);
-            } 
-            // --- CHANGE: The 'else' block below has been completely removed. ---
-            // else {
-            //    // If it has no ID, it's a new item. INSERT it.
-            //    item.invoice_id = invoiceId;
-            //    await connection.query('INSERT INTO purchase_invoice_items SET ?', item);
-            // }
-        }
-
-        await connection.commit();
-        const updatedItems = await connection.query('SELECT * FROM purchase_invoice_items WHERE invoice_id = ?', [invoiceId]);
-        return { id: invoiceId, ...invoiceData, line_items: updatedItems[0] };
+      await connection.commit();
+      const updatedItems = await connection.query('SELECT * FROM purchase_invoice_items WHERE invoice_id = ?', [invoiceId]);
+      return { id: invoiceId, ...invoiceData, line_items: updatedItems[0] };
 
     } catch (error) {
-        await connection.rollback();
-        throw error;
+      await connection.rollback();
+      throw error;
     } finally {
-        connection.release();
+      connection.release();
     }
-},
+  },
 
   findAll: async () => {
     const [rows] = await db.query('SELECT * FROM purchase_invoices ORDER BY issue_date DESC');
     return rows;
+  },
+
+  // Paginated search with multi-term support
+  findAllPaginated: async ({ page = 1, limit = 10, search = '' }) => {
+    const offset = (page - 1) * limit;
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    if (search && search.trim()) {
+      const terms = search.trim().split(/\s+/).filter(t => t.length > 0);
+      if (terms.length > 0) {
+        const searchFields = ['invoice_number', 'code_user', 'supplier_name'];
+
+        const termConditions = terms.map(term => {
+          const fieldConditions = searchFields.map(field => {
+            queryParams.push(`%${term}%`);
+            return `${field} LIKE ?`;
+          }).join(' OR ');
+          return `(${fieldConditions})`;
+        });
+
+        whereConditions.push(`(${termConditions.join(' AND ')})`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    const countQuery = `SELECT COUNT(*) as total FROM purchase_invoices ${whereClause}`;
+    const [countResult] = await db.query(countQuery, queryParams);
+    const total = countResult[0].total;
+
+    const dataQuery = `SELECT * FROM purchase_invoices ${whereClause} ORDER BY issue_date DESC LIMIT ? OFFSET ?`;
+    const [rows] = await db.query(dataQuery, [...queryParams, limit, offset]);
+
+    return {
+      data: rows,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
 
   findById: async (id) => {

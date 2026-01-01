@@ -60,13 +60,24 @@ const purchaseInvoiceController = {
 
   getAllInvoicesWithItems: async (req, res) => {
     try {
-      const invoices = await PurchaseInvoice.findAll();
-      const invoicesWithDetails = await Promise.all(invoices.map(async (invoice) => {
+      const { page = 1, limit = 10, search = '' } = req.body;
+
+      const result = await PurchaseInvoice.findAllPaginated({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search: search || ''
+      });
+
+      const invoicesWithDetails = await Promise.all(result.data.map(async (invoice) => {
         const items = await PurchaseInvoice.findItemsByInvoiceId(invoice.id);
-        // const images = await PurchaseInvoice.findImagesByInvoiceId(invoice.id);
-        return { ...invoice, items, /*images*/ };
+        return { ...invoice, items };
       }));
-      res.status(200).json({ success: true, data: invoicesWithDetails });
+
+      res.status(200).json({
+        success: true,
+        data: invoicesWithDetails,
+        pagination: result.pagination
+      });
     } catch (error) {
       console.error('Error getting all invoices:', error);
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });

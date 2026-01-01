@@ -43,7 +43,7 @@ const Invoice = {
         'reference_no_2', 'sub_total', 'gst_amount', 'grand_total', 'tr_number', 'lr_number',
         'remaining_amount' // Added new field
       ];
-     const invoiceValues = [
+      const invoiceValues = [
         invoiceData.invoice_number || null,
         invoiceData.invoice_date || null,
         invoiceData.customer_id || null,
@@ -129,15 +129,15 @@ const Invoice = {
 
       // 5. Update master stock (PCS & KG) and sales orders, and record stock history
       for (const item of invoiceData.items) {
-       const { item_code, item_finish, total_pcs, net_kg } = item;
-    
+        const { item_code, item_finish, total_pcs, net_kg } = item;
+
         if (!item_code || total_pcs == null) {
           throw new Error('Item with missing item_code or total_pcs found.');
         }
 
         // REMOVED: Stock validation check entirely
         // This allows negative stock (overselling/backorder)
-        
+
         const totalKg = parseFloat(net_kg) || 0;
 
         // Direct stock update - now allows negative values
@@ -174,19 +174,19 @@ const Invoice = {
           `, [item_code, item_finish]);
           if (salesOrders && salesOrders.length > 0) {
             for (const order of salesOrders) {
-                if (total_pcs_to_invoice <= 0) {
-                    break; 
-                }
-                const available_in_this_order = parseFloat(order.quantity_pcs) || 0;
-                const amount_to_subtract = Math.min(total_pcs_to_invoice, available_in_this_order);
-                await connection.query(
-                    'UPDATE sales_orders SET quantity_pcs = quantity_pcs - ? WHERE id = ?',
-                    [amount_to_subtract, order.id]
-                );
-                total_pcs_to_invoice -= amount_to_subtract;
+              if (total_pcs_to_invoice <= 0) {
+                break;
+              }
+              const available_in_this_order = parseFloat(order.quantity_pcs) || 0;
+              const amount_to_subtract = Math.min(total_pcs_to_invoice, available_in_this_order);
+              await connection.query(
+                'UPDATE sales_orders SET quantity_pcs = quantity_pcs - ? WHERE id = ?',
+                [amount_to_subtract, order.id]
+              );
+              total_pcs_to_invoice -= amount_to_subtract;
             }
             if (total_pcs_to_invoice > 0) {
-                throw new Error(`Insufficient quantity in sales orders for item ${item_code}. Short by ${total_pcs_to_invoice} pcs.`);
+              throw new Error(`Insufficient quantity in sales orders for item ${item_code}. Short by ${total_pcs_to_invoice} pcs.`);
             }
           }
         }
@@ -211,42 +211,42 @@ const Invoice = {
       }
 
       // --- NEW: Update customer reference numbers (no_1 and no_2) ---
-    const { reference_no_1, reference_no_2 } = invoiceData;
-    if (customer_id && (reference_no_1 || reference_no_2)) {
-      // Step 1: Find contact ID from contacts table using customer_id
-      const [contactRows] = await connection.query(
-        'SELECT id FROM contacts WHERE code = ? LIMIT 1',
-        [customer_id]
-      );
-      
-      if (contactRows.length > 0) {
-        const contactId = contactRows[0].id;
-        
-        // Step 2: Update no_1 and no_2 in customer_details table
-        const updateFields = [];
-        const updateValues = [];
-        
-        if (reference_no_1 !== null && reference_no_1 !== undefined) {
-          updateFields.push('no_1 = COALESCE(no_1, 0) + ?');
-          updateValues.push(reference_no_1);
-        }
-        
-        if (reference_no_2 !== null && reference_no_2 !== undefined) {
-          updateFields.push('no_2 = COALESCE(no_2, 0) + ?');
-          updateValues.push(reference_no_2);
-        }
-        
-        if (updateFields.length > 0) {
-          updateValues.push(contactId);
-          const updateReferenceQuery = `
+      const { reference_no_1, reference_no_2 } = invoiceData;
+      if (customer_id && (reference_no_1 || reference_no_2)) {
+        // Step 1: Find contact ID from contacts table using customer_id
+        const [contactRows] = await connection.query(
+          'SELECT id FROM contacts WHERE code = ? LIMIT 1',
+          [customer_id]
+        );
+
+        if (contactRows.length > 0) {
+          const contactId = contactRows[0].id;
+
+          // Step 2: Update no_1 and no_2 in customer_details table
+          const updateFields = [];
+          const updateValues = [];
+
+          if (reference_no_1 !== null && reference_no_1 !== undefined) {
+            updateFields.push('no_1 = COALESCE(no_1, 0) + ?');
+            updateValues.push(reference_no_1);
+          }
+
+          if (reference_no_2 !== null && reference_no_2 !== undefined) {
+            updateFields.push('no_2 = COALESCE(no_2, 0) + ?');
+            updateValues.push(reference_no_2);
+          }
+
+          if (updateFields.length > 0) {
+            updateValues.push(contactId);
+            const updateReferenceQuery = `
             UPDATE customer_details 
             SET ${updateFields.join(', ')} 
             WHERE contact_id = ?
           `;
-          await connection.query(updateReferenceQuery, updateValues);
+            await connection.query(updateReferenceQuery, updateValues);
+          }
         }
       }
-    }
 
 
       await connection.commit();
@@ -273,7 +273,7 @@ const Invoice = {
     for (const invoice of invoices) {
       const itemsQuery = 'SELECT * FROM invoice_items WHERE invoice_id = ?';
       const [items] = await db.query(itemsQuery, [invoice.id]);
-      invoice.items = items; 
+      invoice.items = items;
 
       let totalNetKg = 0;
       if (items && items.length > 0) {
@@ -296,42 +296,42 @@ const Invoice = {
     const connection = await db.getConnection();
 
     try {
-        await connection.beginTransaction();
+      await connection.beginTransaction();
 
-        // Step 1: Update the main invoice details (e.g., invoice_date)
-        if (Object.keys(mainInvoiceData).length > 0) {
-            const setClause = Object.keys(mainInvoiceData).map(key => `${key} = ?`).join(', ');
-            const values = [...Object.values(mainInvoiceData), id];
-            await connection.query(`UPDATE invoices SET ${setClause} WHERE id = ?`, values);
-        }
+      // Step 1: Update the main invoice details (e.g., invoice_date)
+      if (Object.keys(mainInvoiceData).length > 0) {
+        const setClause = Object.keys(mainInvoiceData).map(key => `${key} = ?`).join(', ');
+        const values = [...Object.values(mainInvoiceData), id];
+        await connection.query(`UPDATE invoices SET ${setClause} WHERE id = ?`, values);
+      }
 
-        // Step 2: Delete any line items the user removed
-        if (deleted_item_ids && deleted_item_ids.length > 0) {
-            const deleteQuery = 'DELETE FROM invoice_items WHERE id IN (?) AND invoice_id = ?';
-            await connection.query(deleteQuery, [deleted_item_ids, id]);
-        }
+      // Step 2: Delete any line items the user removed
+      if (deleted_item_ids && deleted_item_ids.length > 0) {
+        const deleteQuery = 'DELETE FROM invoice_items WHERE id IN (?) AND invoice_id = ?';
+        await connection.query(deleteQuery, [deleted_item_ids, id]);
+      }
 
-        // Step 3: Update existing items or insert new ones
-        for (const item of items) {
-            if (item.id) {
-                // Update existing item
-                const { id: itemId, ...itemData } = item;
-                await connection.query('UPDATE invoice_items SET ? WHERE id = ? AND invoice_id = ?', [itemData, itemId, id]);
-            } else {
-                // Insert new item
-                item.invoice_id = id;
-                await connection.query('INSERT INTO invoice_items SET ?', item);
-            }
+      // Step 3: Update existing items or insert new ones
+      for (const item of items) {
+        if (item.id) {
+          // Update existing item
+          const { id: itemId, ...itemData } = item;
+          await connection.query('UPDATE invoice_items SET ? WHERE id = ? AND invoice_id = ?', [itemData, itemId, id]);
+        } else {
+          // Insert new item
+          item.invoice_id = id;
+          await connection.query('INSERT INTO invoice_items SET ?', item);
         }
-        
-        await connection.commit();
-        return { success: true, message: 'Invoice updated successfully.' };
+      }
+
+      await connection.commit();
+      return { success: true, message: 'Invoice updated successfully.' };
 
     } catch (error) {
-        await connection.rollback();
-        throw error;
+      await connection.rollback();
+      throw error;
     } finally {
-        connection.release();
+      connection.release();
     }
   },
 
@@ -341,7 +341,7 @@ const Invoice = {
     const [result] = await db.query(query, [id]);
     return result.affectedRows;
   },
-  
+
   getInvoiceSummary: async () => {
     // Unchanged
     const currentDate = new Date();
@@ -382,6 +382,98 @@ const Invoice = {
         remaining_amount: parseNumber(row.remaining_amount)
       };
     });
+  },
+
+  // Paginated invoice summary with search
+  getInvoiceSummaryPaginated: async ({ page = 1, limit = 10, search = '' }) => {
+    const currentDate = new Date();
+    const offset = (page - 1) * limit;
+
+    let whereConditions = [];
+    let queryParams = [];
+
+    if (search && search.trim()) {
+      const terms = search.trim().split(/\s+/).filter(t => t.length > 0);
+      if (terms.length > 0) {
+        const searchFields = ['i.invoice_number', 'i.customer_id'];
+
+        const termConditions = terms.map(term => {
+          const fieldConditions = searchFields.map(field => {
+            queryParams.push(`%${term}%`);
+            return `${field} LIKE ?`;
+          }).join(' OR ');
+          return `(${fieldConditions})`;
+        });
+
+        whereConditions.push(`(${termConditions.join(' AND ')})`);
+      }
+    }
+
+    const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+
+    // Count query
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM invoices i
+      LEFT JOIN contacts c ON i.customer_id = c.code
+      LEFT JOIN customer_details cd ON c.id = cd.contact_id
+      ${whereClause}
+    `;
+    const [countResult] = await db.query(countQuery, queryParams);
+    const total = countResult[0].total;
+
+    // Data query
+    const dataQuery = `
+      SELECT 
+        i.id, i.invoice_number AS invoiceNo, i.invoice_date, i.customer_id,
+        i.reference_no_1 AS No1, i.reference_no_2 AS No2, cd.credit_period,
+        i.remaining_amount
+      FROM invoices i
+      LEFT JOIN contacts c ON i.customer_id = c.code
+      LEFT JOIN customer_details cd ON c.id = cd.contact_id
+      ${whereClause}
+      ORDER BY i.id DESC
+      LIMIT ? OFFSET ?
+    `;
+    const [rows] = await db.query(dataQuery, [...queryParams, limit, offset]);
+
+    const parseNumber = (val) => {
+      const num = parseFloat(val);
+      return isNaN(num) ? 0 : num;
+    };
+
+    const data = rows.map(row => {
+      const invoiceDate = new Date(row.invoice_date);
+      const diffTime = currentDate - invoiceDate;
+      const daysElapsed = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+      let creditDays = 0;
+      if (row.credit_period) {
+        const match = row.credit_period.match(/\d+/);
+        creditDays = match ? parseInt(match[0]) : 0;
+      }
+      const daysLeft = creditDays - daysElapsed;
+      const daysOverdue = daysLeft < 0 ? Math.abs(daysLeft) : 0;
+      let status = 'PENDING';
+      if (daysOverdue > 0) {
+        status = 'OVERDUE';
+      }
+      return {
+        id: row.id, invoiceNo: row.invoiceNo, cutomer_id: row.customer_id, daysElapsed,
+        creditDays, daysLeft: daysLeft >= 0 ? daysLeft : 0, daysOverdue, status,
+        No1: row.No1 || 0, No2: row.No2 || 0, No1_plus_No2: parseNumber(row.No1) + parseNumber(row.No2),
+        remaining_amount: parseNumber(row.remaining_amount)
+      };
+    });
+
+    return {
+      data,
+      pagination: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit)
+      }
+    };
   },
   // Add this new function inside the Invoice object, for example, after getInvoiceSummary.
 
@@ -456,8 +548,7 @@ const Invoice = {
         aging_summary: agingSummary
       };
 
-    } catch (error)
-      {
+    } catch (error) {
       console.error("Error in getStatementByCustomerId:", error);
       throw error;
     } finally {

@@ -95,10 +95,20 @@ const invoiceController = {
   },
 
   getInvoiceSummary: async (req, res) => {
-    // Unchanged
     try {
-      const summary = await Invoice.getInvoiceSummary();
-      res.status(200).json({ success: true, data: summary });
+      const { page = 1, limit = 10, search = '' } = req.body;
+
+      const result = await Invoice.getInvoiceSummaryPaginated({
+        page: parseInt(page),
+        limit: parseInt(limit),
+        search: search || ''
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result.data,
+        pagination: result.pagination
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
