@@ -1,6 +1,7 @@
 const { exec } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 
 const backupController = {
     /**
@@ -14,12 +15,9 @@ const backupController = {
             const dbPassword = process.env.DB_PASSWORD || '';
             const dbName = process.env.DB_NAME || 'inventory_db';
 
-            // MySQL bin path - update this in .env file or change default here
-            // Common paths: 
-            // XAMPP: C:\\xampp\\mysql\\bin\\mysqldump
-            // MySQL: C:\\Program Files\\MySQL\\MySQL Server 8.0\\bin\\mysqldump
-            // WAMP: C:\\wamp64\\bin\\mysql\\mysql8.0.31\\bin\\mysqldump
-            const mysqlDumpPath = process.env.MYSQLDUMP_PATH || 'C:\\xampp\\mysql\\bin\\mysqldump';
+            // Detect OS and set mysqldump path
+            const isWindows = os.platform() === 'win32';
+            const mysqlDumpPath = process.env.MYSQLDUMP_PATH || (isWindows ? 'C:\\xampp\\mysql\\bin\\mysqldump' : 'mysqldump');
 
             // Create backup filename with timestamp
             const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
@@ -32,15 +30,27 @@ const backupController = {
                 fs.mkdirSync(backupDir, { recursive: true });
             }
 
-            // Build mysqldump command with full path
-            let command = `"${mysqlDumpPath}" -h ${dbHost} -u ${dbUser}`;
-            if (dbPassword) {
-                command += ` -p${dbPassword}`;
+            // Build mysqldump command
+            let command;
+            if (isWindows) {
+                command = `"${mysqlDumpPath}" -h ${dbHost} -u ${dbUser}`;
+                if (dbPassword) {
+                    command += ` -p${dbPassword}`;
+                }
+                command += ` ${dbName} > "${backupPath}"`;
+            } else {
+                // Linux command
+                command = `${mysqlDumpPath} -h ${dbHost} -u ${dbUser}`;
+                if (dbPassword) {
+                    command += ` -p'${dbPassword}'`;
+                }
+                command += ` ${dbName} > "${backupPath}"`;
             }
-            command += ` ${dbName} > "${backupPath}"`;
 
-            // Execute mysqldump
-            exec(command, { shell: 'cmd.exe' }, (error, stdout, stderr) => {
+            // Execute mysqldump with appropriate shell
+            const execOptions = isWindows ? { shell: 'cmd.exe' } : { shell: '/bin/bash' };
+
+            exec(command, execOptions, (error, stdout, stderr) => {
                 if (error) {
                     console.error('Backup error:', error);
                     return res.status(500).json({
@@ -206,72 +216,83 @@ const backupController = {
    * Expects: req.body.filename (name of .sql file in /backups)
    * WARNING: This will overwrite current database data.
    */
-  importBackup: async (req, res) => {
-  try {
-    if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'SQL file is required'
-      });
-    }
+    importBackup: async (req, res) => {
+        try {
+            if (!req.file) {
+                return res.status(400).json({
+                    success: false,
+                    message: 'SQL file is required'
+                });
+            }
 
-    const backupPath = req.file.path;
+            const backupPath = req.file.path;
 
-    const dbHost = process.env.DB_HOST || 'localhost';
-    const dbUser = process.env.DB_USER || 'root';
-    const dbPassword = process.env.DB_PASSWORD || '';
-    const dbName = process.env.DB_NAME || 'inventory';
+            const dbHost = process.env.DB_HOST || 'localhost';
+            const dbUser = process.env.DB_USER || 'root';
+            const dbPassword = process.env.DB_PASSWORD || '';
+            const dbName = process.env.DB_NAME || 'inventory';
 
-    const mysqlPath = process.env.MYSQL_PATH || 'C:\\xampp\\mysql\\bin\\mysql';
+            // Detect OS
+            const isWindows = os.platform() === 'win32';
+            const mysqlPath = process.env.MYSQL_PATH || (isWindows ? 'C:\\xampp\\mysql\\bin\\mysql' : 'mysql');
 
-    let baseCmd = `"${mysqlPath}" -h ${dbHost} -u ${dbUser}`;
-    if (dbPassword) {
-      baseCmd += ` -p${dbPassword}`;
-    }
+            let baseCmd;
+            if (isWindows) {
+                baseCmd = `"${mysqlPath}" -h ${dbHost} -u ${dbUser}`;
+                if (dbPassword) {
+                    baseCmd += ` -p${dbPassword}`;
+                }
+            } else {
+                baseCmd = `${mysqlPath} -h ${dbHost} -u ${dbUser}`;
+                if (dbPassword) {
+                    baseCmd += ` -p'${dbPassword}'`;
+                }
+            }
 
-    // FIXED: no backticks or extra escaping
-    const prepCommand =
-      `${baseCmd} -e "DROP DATABASE IF EXISTS ${dbName}; CREATE DATABASE ${dbName};"`;
+            const execOptions = isWindows ? { shell: 'cmd.exe' } : { shell: '/bin/bash' };
 
-    exec(prepCommand, { shell: 'cmd.exe' }, (prepError, prepStdout, prepStderr) => {
-      if (prepError) {
-        console.error('Prepare (drop/create) DB error:', prepError);
-        console.error('stderr:', prepStderr);
-        return res.status(500).json({
-          success: false,
-          message: 'Failed to recreate database before import',
-          error: prepError.message
-        });
-      }
+            // Drop and recreate database
+            const prepCommand = `${baseCmd} -e "DROP DATABASE IF EXISTS ${dbName}; CREATE DATABASE ${dbName};"`;
 
-      let importCommand = `${baseCmd} ${dbName} < "${backupPath}"`;
+            exec(prepCommand, execOptions, (prepError, prepStdout, prepStderr) => {
+                if (prepError) {
+                    console.error('Prepare (drop/create) DB error:', prepError);
+                    console.error('stderr:', prepStderr);
+                    return res.status(500).json({
+                        success: false,
+                        message: 'Failed to recreate database before import',
+                        error: prepError.message
+                    });
+                }
 
-      exec(importCommand, { shell: 'cmd.exe' }, (error, stdout, stderr) => {
-        if (error) {
-          console.error('Import error:', error);
-          console.error('stderr:', stderr);
-          return res.status(500).json({
-            success: false,
-            message: 'Failed to import backup',
-            error: error.message
-          });
+                const importCommand = `${baseCmd} ${dbName} < "${backupPath}"`;
+
+                exec(importCommand, execOptions, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error('Import error:', error);
+                        console.error('stderr:', stderr);
+                        return res.status(500).json({
+                            success: false,
+                            message: 'Failed to import backup',
+                            error: error.message
+                        });
+                    }
+
+                    return res.status(200).json({
+                        success: true,
+                        message: 'Database replaced and imported successfully'
+                    });
+                });
+            });
+        } catch (error) {
+            console.error('Import controller error:', error);
+            return res.status(500).json({
+                success: false,
+                message: 'Server Error',
+                error: error.message
+            });
         }
-
-        return res.status(200).json({
-          success: true,
-          message: 'Database replaced and imported successfully'
-        });
-      });
-    });
-  } catch (error) {
-    console.error('Import controller error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Server Error',
-      error: error.message
-    });
-  }
-}
+    }
 
 
 };
