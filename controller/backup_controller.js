@@ -200,7 +200,80 @@ const backupController = {
                 error: error.message
             });
         }
+    },
+    /**
+   * Import (restore) database from a backup .sql file
+   * Expects: req.body.filename (name of .sql file in /backups)
+   * WARNING: This will overwrite current database data.
+   */
+  importBackup: async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'SQL file is required'
+      });
     }
+
+    const backupPath = req.file.path;
+
+    const dbHost = process.env.DB_HOST || 'localhost';
+    const dbUser = process.env.DB_USER || 'root';
+    const dbPassword = process.env.DB_PASSWORD || '';
+    const dbName = process.env.DB_NAME || 'inventory';
+
+    const mysqlPath = process.env.MYSQL_PATH || 'C:\\xampp\\mysql\\bin\\mysql';
+
+    let baseCmd = `"${mysqlPath}" -h ${dbHost} -u ${dbUser}`;
+    if (dbPassword) {
+      baseCmd += ` -p${dbPassword}`;
+    }
+
+    // FIXED: no backticks or extra escaping
+    const prepCommand =
+      `${baseCmd} -e "DROP DATABASE IF EXISTS ${dbName}; CREATE DATABASE ${dbName};"`;
+
+    exec(prepCommand, { shell: 'cmd.exe' }, (prepError, prepStdout, prepStderr) => {
+      if (prepError) {
+        console.error('Prepare (drop/create) DB error:', prepError);
+        console.error('stderr:', prepStderr);
+        return res.status(500).json({
+          success: false,
+          message: 'Failed to recreate database before import',
+          error: prepError.message
+        });
+      }
+
+      let importCommand = `${baseCmd} ${dbName} < "${backupPath}"`;
+
+      exec(importCommand, { shell: 'cmd.exe' }, (error, stdout, stderr) => {
+        if (error) {
+          console.error('Import error:', error);
+          console.error('stderr:', stderr);
+          return res.status(500).json({
+            success: false,
+            message: 'Failed to import backup',
+            error: error.message
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          message: 'Database replaced and imported successfully'
+        });
+      });
+    });
+  } catch (error) {
+    console.error('Import controller error:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Server Error',
+      error: error.message
+    });
+  }
+}
+
+
 };
 
 module.exports = backupController;
