@@ -40,7 +40,8 @@ const Invoice = {
       // 1. Insert into invoices table (Unchanged)
       const invoiceFields = [
         'invoice_number', 'invoice_date', 'customer_id', 'reference_no_1',
-        'reference_no_2', 'sub_total', 'gst_amount', 'grand_total', 'tr_number', 'lr_number',
+        'reference_no_2', 'sub_total', 'gst_amount', 'other_charge', 'other_charge_amount',
+        'grand_total', 'tr_number', 'lr_number',
         'remaining_amount' // Added new field
       ];
       const invoiceValues = [
@@ -51,6 +52,8 @@ const Invoice = {
         invoiceData.reference_no_2 || null,
         invoiceData.sub_total || 0,
         invoiceData.gst_amount || 0,
+        invoiceData.other_charge || null,
+        invoiceData.other_charge_amount || 0,
         invoiceData.grand_total || 0,
         invoiceData.tr_number || null,
         invoiceData.lr_number || null,
