@@ -8,14 +8,14 @@ const cartonInventoryController = {
   addCarton: async (req, res) => {
     try {
       const created_by = req.user.id; // Get user ID from auth middleware
-      const { carton_name, carton_quantity } = req.body;
+      const { carton_name, carton_quantity, ctn_wt } = req.body;
 
       // Basic validation
       if (!carton_name || carton_quantity === undefined) {
         return res.status(400).json({ success: false, message: 'Carton name and quantity are required.' });
       }
 
-      const newCarton = await CartonInventory.create({ carton_name, carton_quantity, created_by });
+      const newCarton = await CartonInventory.create({ carton_name, carton_quantity, ctn_wt, created_by });
       await logUserActivity(req, {
         model_name: 'carton_inventory',
         action_type: 'CREATE',
@@ -51,12 +51,12 @@ const cartonInventoryController = {
 
   updateCarton: async (req, res) => {
     try {
-      const { id, carton_name, carton_quantity } = req.body;
+      const { id, carton_name, carton_quantity, ctn_wt } = req.body;
       if (!id) {
         return res.status(400).json({ success: false, message: 'Carton ID is required.' });
       }
 
-      const affectedRows = await CartonInventory.update(id, { carton_name, carton_quantity });
+      const affectedRows = await CartonInventory.update(id, { carton_name, carton_quantity, ctn_wt });
       if (affectedRows === 0) {
         return res.status(404).json({ success: false, message: 'Carton not found.' });
       }

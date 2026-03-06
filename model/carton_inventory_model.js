@@ -10,14 +10,14 @@ const CartonInventory = {
    * @returns {Promise<object>} The newly created carton object.
    */
   create: async (cartonData) => {
-    const { carton_name, carton_quantity, created_by } = cartonData;
-    const query = 'INSERT INTO carton_inventory (carton_name, carton_quantity, created_by) VALUES (?, ?, ?)';
-    const [result] = await db.query(query, [carton_name, carton_quantity, created_by]);
+    const { carton_name, carton_quantity, ctn_wt, created_by } = cartonData;
+    const query = 'INSERT INTO carton_inventory (carton_name, carton_quantity, ctn_wt, created_by) VALUES (?, ?, ?, ?)';
+    const [result] = await db.query(query, [carton_name, carton_quantity, ctn_wt || 0, created_by]);
     return { id: result.insertId, ...cartonData };
   },
   findAllCartonNames: async () => {
-    const [rows] = await db.query('SELECT carton_name FROM carton_inventory');
-    return rows.map(row => row.carton_name);
+    const [rows] = await db.query('SELECT carton_name, ctn_wt FROM carton_inventory');
+    return rows;
   },
 
   findById: async (id) => {
@@ -26,9 +26,9 @@ const CartonInventory = {
   },
 
   update: async (id, cartonData) => {
-    const { carton_name, carton_quantity } = cartonData;
-    const query = 'UPDATE carton_inventory SET carton_name = ?, carton_quantity = ? WHERE id = ?';
-    const [result] = await db.query(query, [carton_name, carton_quantity, id]);
+    const { carton_name, carton_quantity, ctn_wt } = cartonData;
+    const query = 'UPDATE carton_inventory SET carton_name = ?, carton_quantity = ?, ctn_wt = ? WHERE id = ?';
+    const [result] = await db.query(query, [carton_name, carton_quantity, ctn_wt || 0, id]);
     return result.affectedRows;
   },
 
