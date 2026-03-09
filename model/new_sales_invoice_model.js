@@ -2,36 +2,6 @@ const db = require('../config/db'); // Assuming you have a db config file
 
 const Invoice = {
   create: async (invoiceData) => {
-    // --- START: CARTON STOCK VALIDATION LOGIC --- (Unchanged)
-    if (invoiceData.cartons && invoiceData.cartons.length > 0) {
-      const requiredCounts = {};
-      for (const carton of invoiceData.cartons) {
-        if (carton.carton_number) {
-          requiredCounts[carton.carton_number] = (requiredCounts[carton.carton_number] || 0) + 1;
-        }
-      }
-      const requiredCartonNames = Object.keys(requiredCounts);
-
-      const [availableStockRows] = await db.query(
-        'SELECT carton_name, carton_quantity FROM carton_inventory WHERE carton_name IN (?)',
-        [requiredCartonNames]
-      );
-
-      const availableStockMap = new Map(
-        availableStockRows.map(row => [row.carton_name, row.carton_quantity])
-      );
-
-      for (const cartonName of requiredCartonNames) {
-        const required = requiredCounts[cartonName];
-        const available = availableStockMap.get(cartonName) || 0;
-
-        if (required > available) {
-          throw new Error(`Insufficient stock for carton ${cartonName}. Required: ${required}, Available: ${available}.`);
-        }
-      }
-    }
-    // --- END: CARTON STOCK VALIDATION LOGIC ---
-
 
     const connection = await db.getConnection();
     try {
