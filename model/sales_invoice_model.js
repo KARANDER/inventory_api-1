@@ -99,29 +99,29 @@ const SalesInvoice = {
     await db.query('DELETE FROM sales_invoice WHERE id = ?', [id]);
   },
   getDistinctCustomerNames: async () => {
-  const query = `
+    const query = `
     SELECT DISTINCT customer_name 
     FROM sales_orders 
     WHERE customer_name IS NOT NULL AND customer_name != '' 
     ORDER BY customer_name ASC
   `;
-  const [rows] = await db.query(query);
-  return rows.map(row => row.customer_name);
-},
+    const [rows] = await db.query(query);
+    return rows.map(row => row.customer_name);
+  },
 
-findFinishNoteByCustomerName: async (customerName) => {
-  const query = `
+  findFinishNoteByCustomerName: async (customerName) => {
+    const query = `
     SELECT finish, note
     FROM sales_orders
     WHERE customer_name = ?
   `;
-  const [rows] = await db.query(query, [customerName]);
-  return rows;
-},
+    const [rows] = await db.query(query, [customerName]);
+    return rows;
+  },
 
-findUnfinishedFinishesByCustomerId: async (customerId, code_user) => {
-  // Query 1: Get all unfinished sales orders for the customer (this is your original query)
-  const salesOrderQuery = `
+  findUnfinishedFinishesByCustomerId: async (customerId, code_user) => {
+    // Query 1: Get all unfinished sales orders for the customer (this is your original query)
+    const salesOrderQuery = `
     SELECT DISTINCT
       finish, 
       kg_box, 
@@ -130,19 +130,19 @@ findUnfinishedFinishesByCustomerId: async (customerId, code_user) => {
       pcs_box,
       note 
     FROM sales_orders 
-    WHERE customer_id = ? AND invoice_status != 'completed'
+    WHERE customer_id = ? AND (invoice_status IS NULL OR invoice_status != 'completed')
   `;
-  
-  const [salesOrders] = await db.query(salesOrderQuery, [customerId]);
+
+    const [salesOrders] = await db.query(salesOrderQuery, [customerId]);
 
 
-  // If we didn't find any sales orders, we can stop here.
-  if (salesOrders.length === 0) {
-    return [];
-  }
+    // If we didn't find any sales orders, we can stop here.
+    if (salesOrders.length === 0) {
+      return [];
+    }
 
-  // Query 2: Get the single description from inventory_items using the provided code_user
-  const descriptionQuery = `
+    // Query 2: Get the single description from inventory_items using the provided code_user
+    const descriptionQuery = `
     SELECT description,pic_or_kg,kg_dzn,
       empty_wt,
       actual_wt 
@@ -150,30 +150,30 @@ findUnfinishedFinishesByCustomerId: async (customerId, code_user) => {
     WHERE code_user = ? 
     LIMIT 1
   `;
-  const [inventoryRows] = await db.query(descriptionQuery, [customerId]);
+    const [inventoryRows] = await db.query(descriptionQuery, [customerId]);
 
-  // Get the description from the result, or set it to null if nothing was found.
-  const description = inventoryRows.length > 0 ? inventoryRows[0].description : null;
-  const picKg = inventoryRows.length > 0 ? inventoryRows[0].pic_or_kg : null;
-  const kg_dzn = inventoryRows.length > 0 ? inventoryRows[0].kg_dzn : null;
-  const empty_wt = inventoryRows.length > 0 ? inventoryRows[0].empty_wt : null;
-  const actual_wt = inventoryRows.length > 0 ? inventoryRows[0].actual_wt : null;
+    // Get the description from the result, or set it to null if nothing was found.
+    const description = inventoryRows.length > 0 ? inventoryRows[0].description : null;
+    const picKg = inventoryRows.length > 0 ? inventoryRows[0].pic_or_kg : null;
+    const kg_dzn = inventoryRows.length > 0 ? inventoryRows[0].kg_dzn : null;
+    const empty_wt = inventoryRows.length > 0 ? inventoryRows[0].empty_wt : null;
+    const actual_wt = inventoryRows.length > 0 ? inventoryRows[0].actual_wt : null;
 
-  // Add the description to every sales order object we found earlier.
-  const finalResult = salesOrders.map(order => {
-    return {
-      ...order, // This copies all the original fields from the order
-      description: description,
-      pic_or_kg:picKg,
-      kg_dzn:kg_dzn,
-      empty_wt:empty_wt,
-      actual_wt:actual_wt // This adds the new description field
-    };
-  });
+    // Add the description to every sales order object we found earlier.
+    const finalResult = salesOrders.map(order => {
+      return {
+        ...order, // This copies all the original fields from the order
+        description: description,
+        pic_or_kg: picKg,
+        kg_dzn: kg_dzn,
+        empty_wt: empty_wt,
+        actual_wt: actual_wt // This adds the new description field
+      };
+    });
 
-  return finalResult;
-},
-findByInvoiceNo: async (invoiceNo) => {
+    return finalResult;
+  },
+  findByInvoiceNo: async (invoiceNo) => {
     const query = 'SELECT * FROM sales_invoice WHERE invoice_no = ?';
     const [rows] = await db.query(query, [invoiceNo]);
     return rows;
@@ -226,17 +226,17 @@ findByInvoiceNo: async (invoiceNo) => {
           `;
           await connection.query(updateQtyQuery, [total_pcs, item_code, item_finish]);
         }
-        
+
         // 3. UPDATE master_items
         if (item_code && total_pcs > 0) {
-            const totalKg = parseFloat(net_kg) || 0;
-            const updateStockQuery = `
+          const totalKg = parseFloat(net_kg) || 0;
+          const updateStockQuery = `
               UPDATE master_items 
               SET stock_quantity = GREATEST(stock_quantity - ?, 0),
                   stock_kg       = GREATEST(COALESCE(stock_kg, 0) - ?, 0)
               WHERE item_code = ?
             `;
-            await connection.query(updateStockQuery, [total_pcs, totalKg, item_code]);
+          await connection.query(updateStockQuery, [total_pcs, totalKg, item_code]);
         }
 
         createdInvoices.push({ id: result.insertId, ...invoiceData });
