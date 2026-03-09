@@ -38,48 +38,48 @@ const StockHistory = {
   },
 
   findByItemCode: async (itemCode, filters = {}) => {
-    let query = `
-      SELECT *
-      FROM stock_history
-      WHERE item_code = ?
-    `;
-
+    let whereClause = ' WHERE item_code = ?';
     const values = [itemCode];
 
     if (filters.start_date) {
-      query += ' AND movement_date >= ?';
+      whereClause += ' AND movement_date >= ?';
       values.push(filters.start_date);
     }
 
     if (filters.end_date) {
-      query += ' AND movement_date <= ?';
+      whereClause += ' AND movement_date <= ?';
       values.push(filters.end_date);
     }
 
     if (filters.transaction_type) {
-      query += ' AND transaction_type = ?';
+      whereClause += ' AND transaction_type = ?';
       values.push(filters.transaction_type);
     }
 
     if (filters.invoice_type) {
-      query += ' AND invoice_type = ?';
+      whereClause += ' AND invoice_type = ?';
       values.push(filters.invoice_type);
     }
 
-    query += ' ORDER BY movement_date DESC, created_at DESC';
+    // Count query for pagination
+    const [countResult] = await db.query('SELECT COUNT(*) as total FROM stock_history' + whereClause, values);
+    const total = countResult[0].total;
+
+    let query = 'SELECT * FROM stock_history' + whereClause + ' ORDER BY movement_date DESC, created_at DESC';
+    const dataValues = [...values];
 
     if (filters.limit) {
       query += ' LIMIT ?';
-      values.push(parseInt(filters.limit));
+      dataValues.push(parseInt(filters.limit));
 
-      if (filters.offset) {
+      if (filters.offset !== undefined) {
         query += ' OFFSET ?';
-        values.push(parseInt(filters.offset));
+        dataValues.push(parseInt(filters.offset));
       }
     }
 
-    const [rows] = await db.query(query, values);
-    return rows;
+    const [rows] = await db.query(query, dataValues);
+    return { rows, total };
   },
 
   findAll: async (filters = {}) => {

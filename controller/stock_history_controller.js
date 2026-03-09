@@ -12,16 +12,20 @@ const stockHistoryController = {
         });
       }
 
+      const page = parseInt(req.body.page) || 1;
+      const pageLimit = parseInt(limit) || 100;
+      const pageOffset = (page - 1) * pageLimit;
+
       const filters = {
         start_date,
         end_date,
         transaction_type,
         invoice_type,
-        limit: limit || 100,
-        offset: offset || 0
+        limit: pageLimit,
+        offset: pageOffset
       };
 
-      const history = await StockHistory.findByItemCode(item_code, filters);
+      const { rows: history, total } = await StockHistory.findByItemCode(item_code, filters);
       const summary = await StockHistory.getSummaryByItemCode(item_code, filters);
 
       res.status(200).json({
@@ -30,6 +34,12 @@ const stockHistoryController = {
           item_code,
           history,
           summary
+        },
+        pagination: {
+          page,
+          limit: pageLimit,
+          total,
+          totalPages: Math.ceil(total / pageLimit)
         }
       });
     } catch (error) {

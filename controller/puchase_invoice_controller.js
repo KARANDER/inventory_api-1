@@ -16,8 +16,15 @@ const processInvoiceItems = (items = []) => {
     // 1. Calculate the balance
     const peti_balance = no_of_peti - ret_peti_no;
 
-    // 2. Determine the status based on the balance
-    const pati_status = peti_balance === 0 ? 0 : 1;
+    // 2. Determine the status: 0 = Pending, 1 = Partial, 2 = Done
+    let pati_status;
+    if (ret_peti_no === 0) {
+      pati_status = 0; // Pending - no peti returned
+    } else if (ret_peti_no >= no_of_peti) {
+      pati_status = 2; // Done - all peti returned
+    } else {
+      pati_status = 1; // Partial - some peti returned
+    }
 
     // 3. Return a new item object with the calculated fields
     return {
