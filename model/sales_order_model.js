@@ -2,9 +2,11 @@ const db = require('../config/db');
 
 const SalesOrder = {
   create: async (orderData) => {
+    // Auto-set initial_qty to same value as quantity_pcs
+    orderData.initial_qty = orderData.quantity_pcs || null;
     const fields = [
       'order_number', 'order_date', 'customer_id', 'item_code', 'finish',
-      'stock_qty', 'scrap', 'labour', 'kg_dzn', 'pcs_box', 'box_ctn',
+      'stock_qty', 'initial_qty', 'scrap', 'labour', 'kg_dzn', 'pcs_box', 'box_ctn',
       'pcs_ctn', 'kg_box', 'qty_ctn', 'total_kg', 'quantity_pcs',
       'order_stock', 'manufacturer_name', 'po_vr', 'note', 'invoice_status',
       'created_by', 'customer_code', 'customer_name', 'rate_pcs', 'rate_kz'
@@ -19,7 +21,14 @@ const SalesOrder = {
 
   findAll: async () => {
     const query = `
-      SELECT so.*, c.contact_name as customer_name 
+      SELECT so.*, c.contact_name as customer_name,
+        CASE
+          WHEN so.initial_qty IS NULL THEN 'Uninvoiced'
+          WHEN so.quantity_pcs = so.initial_qty THEN 'Uninvoiced'
+          WHEN so.quantity_pcs > 0 AND so.quantity_pcs < so.initial_qty THEN 'Partial'
+          WHEN so.quantity_pcs = 0 THEN 'Invoiced'
+          ELSE 'Uninvoiced'
+        END AS invoice_status
       FROM sales_orders so
       LEFT JOIN contacts c ON so.customer_id = c.id
       ORDER BY so.id DESC
@@ -30,7 +39,14 @@ const SalesOrder = {
 
   findById: async (id) => {
     const query = `
-      SELECT so.*, c.contact_name as customer_name 
+      SELECT so.*, c.contact_name as customer_name,
+        CASE
+          WHEN so.initial_qty IS NULL THEN 'Uninvoiced'
+          WHEN so.quantity_pcs = so.initial_qty THEN 'Uninvoiced'
+          WHEN so.quantity_pcs > 0 AND so.quantity_pcs < so.initial_qty THEN 'Partial'
+          WHEN so.quantity_pcs = 0 THEN 'Invoiced'
+          ELSE 'Uninvoiced'
+        END AS invoice_status
       FROM sales_orders so
       LEFT JOIN contacts c ON so.customer_id = c.id
       WHERE so.id = ?
@@ -40,6 +56,9 @@ const SalesOrder = {
   },
 
   update: async (id, orderData) => {
+    // Protect initial_qty and invoice_status from manual edits
+    delete orderData.initial_qty;
+    delete orderData.invoice_status;
     const fields = Object.keys(orderData);
     const setClause = fields.map(field => `${field} = ?`).join(', ');
     const values = [...fields.map(field => orderData[field]), id];
@@ -60,7 +79,14 @@ const SalesOrder = {
   },
   searchByUserIds: async (userIds) => {
     const query = `
-      SELECT so.*, c.contact_name as customer_name 
+      SELECT so.*, c.contact_name as customer_name,
+        CASE
+          WHEN so.initial_qty IS NULL THEN 'Uninvoiced'
+          WHEN so.quantity_pcs = so.initial_qty THEN 'Uninvoiced'
+          WHEN so.quantity_pcs > 0 AND so.quantity_pcs < so.initial_qty THEN 'Partial'
+          WHEN so.quantity_pcs = 0 THEN 'Invoiced'
+          ELSE 'Uninvoiced'
+        END AS invoice_status
       FROM sales_orders so 
       LEFT JOIN contacts c ON so.customer_id = c.id 
       WHERE so.created_by IN (?)
@@ -174,7 +200,14 @@ const SalesOrder = {
 
     // Data query
     const dataQuery = `
-      SELECT so.*, c.contact_name as customer_name 
+      SELECT so.*, c.contact_name as customer_name,
+        CASE
+          WHEN so.initial_qty IS NULL THEN 'Uninvoiced'
+          WHEN so.quantity_pcs = so.initial_qty THEN 'Uninvoiced'
+          WHEN so.quantity_pcs > 0 AND so.quantity_pcs < so.initial_qty THEN 'Partial'
+          WHEN so.quantity_pcs = 0 THEN 'Invoiced'
+          ELSE 'Uninvoiced'
+        END AS invoice_status
       FROM sales_orders so
       LEFT JOIN contacts c ON so.customer_id = c.id
       ${whereClause}
