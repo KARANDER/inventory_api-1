@@ -309,10 +309,110 @@ const Invoice = {
   },
 
   delete: async (id) => {
-    // Unchanged
-    const query = 'DELETE FROM invoices WHERE id = ?';
-    const [result] = await db.query(query, [id]);
-    return result.affectedRows;
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Get the invoice data before deleting
+      const [invoiceRows] = await connection.query('SELECT * FROM invoices WHERE id = ?', [id]);
+      if (invoiceRows.length === 0) {
+        await connection.rollback();
+        return 0;
+      }
+      const invoice = invoiceRows[0];
+
+      // 2. Get invoice items to reverse stock
+      const [items] = await connection.query('SELECT * FROM invoice_items WHERE invoice_id = ?', [id]);
+
+      for (const item of items) {
+        const { item_code, total_pcs, net_kg } = item;
+        const totalKg = parseFloat(net_kg) || 0;
+        const totalPcs = parseFloat(total_pcs) || 0;
+
+        // 2a. Reverse master_items stock (add back pcs and kg)
+        if (item_code && totalPcs > 0) {
+          const reverseStockQuery = `
+            UPDATE master_items 
+            SET stock_quantity = stock_quantity + ?,
+                stock_kg       = COALESCE(stock_kg, 0) + ?
+            WHERE item_code = ?
+          `;
+          await connection.query(reverseStockQuery, [totalPcs, totalKg, item_code]);
+        }
+
+        // 2b. Delete stock history entries for this invoice
+        if (item_code && invoice.invoice_number) {
+          await connection.query(
+            `DELETE FROM stock_history WHERE item_code = ? AND invoice_number = ? AND invoice_type = 'SALES'`,
+            [item_code, invoice.invoice_number]
+          );
+        }
+      }
+
+      // 3. Reverse carton inventory (add back carton quantities)
+      const [cartons] = await connection.query('SELECT * FROM shipping_cartons WHERE invoice_id = ?', [id]);
+      if (cartons.length > 0) {
+        const cartonCounts = {};
+        for (const carton of cartons) {
+          if (carton.carton_number) {
+            cartonCounts[carton.carton_number] = (cartonCounts[carton.carton_number] || 0) + 1;
+          }
+        }
+        for (const cartonName in cartonCounts) {
+          const countToAdd = cartonCounts[cartonName];
+          await connection.query(
+            'UPDATE carton_inventory SET carton_quantity = carton_quantity + ? WHERE carton_name = ?',
+            [countToAdd, cartonName]
+          );
+        }
+      }
+
+      // 4. Reverse customer_details total_amount
+      const { customer_id, grand_total, reference_no_1, reference_no_2 } = invoice;
+      if (customer_id && grand_total && grand_total > 0) {
+        const [contactRows] = await connection.query(
+          'SELECT id FROM contacts WHERE code = ? AND type = "Customer" LIMIT 1',
+          [customer_id]
+        );
+        if (contactRows.length > 0) {
+          const contactId = contactRows[0].id;
+          await connection.query(
+            'UPDATE customer_details SET total_amount = COALESCE(total_amount, 0) - ? WHERE contact_id = ?',
+            [grand_total, contactId]
+          );
+
+          // 4a. Reverse no_1 and no_2
+          const reverseFields = [];
+          const reverseValues = [];
+          if (reference_no_1 !== null && reference_no_1 !== undefined) {
+            reverseFields.push('no_1 = COALESCE(no_1, 0) - ?');
+            reverseValues.push(reference_no_1);
+          }
+          if (reference_no_2 !== null && reference_no_2 !== undefined) {
+            reverseFields.push('no_2 = COALESCE(no_2, 0) - ?');
+            reverseValues.push(reference_no_2);
+          }
+          if (reverseFields.length > 0) {
+            reverseValues.push(contactId);
+            await connection.query(
+              `UPDATE customer_details SET ${reverseFields.join(', ')} WHERE contact_id = ?`,
+              reverseValues
+            );
+          }
+        }
+      }
+
+      // 5. Delete the invoice (invoice_items and shipping_cartons should cascade)
+      await connection.query('DELETE FROM invoices WHERE id = ?', [id]);
+
+      await connection.commit();
+      return 1;
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
   },
 
   getInvoiceSummary: async () => {
