@@ -60,6 +60,17 @@ const PurchaseInvoice = {
         }
       }
 
+      // Calculate and set total_amount and balance_due on the invoice
+      const [totalRows] = await connection.query(
+        'SELECT COALESCE(SUM(amount), 0) as total FROM purchase_invoice_items WHERE invoice_id = ?',
+        [newInvoiceId]
+      );
+      const calculatedTotal = parseFloat(totalRows[0].total) || 0;
+      await connection.query(
+        'UPDATE purchase_invoices SET total_amount = ?, balance_due = ? WHERE id = ?',
+        [calculatedTotal, calculatedTotal, newInvoiceId]
+      );
+
       // Update supplier's total amount if applicable
       if (userCode && invoiceTotal > 0) {
         const [contacts] = await connection.query('SELECT id FROM contacts WHERE code = ?', [userCode]);
@@ -127,7 +138,15 @@ const PurchaseInvoice = {
   },
 
   findAll: async () => {
-    const [rows] = await db.query('SELECT * FROM purchase_invoices ORDER BY issue_date DESC');
+    const [rows] = await db.query(`
+      SELECT *,
+        CASE
+          WHEN balance_due = 0 AND total_amount > 0 THEN 'Paid'
+          WHEN balance_due > 0 AND balance_due < total_amount THEN 'Partial'
+          ELSE 'Pending'
+        END AS status
+      FROM purchase_invoices ORDER BY issue_date DESC
+    `);
     return rows;
   },
 
@@ -161,7 +180,13 @@ const PurchaseInvoice = {
     const [countResult] = await db.query(countQuery, queryParams);
     const total = countResult[0].total;
 
-    const dataQuery = `SELECT * FROM purchase_invoices ${whereClause} ORDER BY issue_date DESC LIMIT ? OFFSET ?`;
+    const dataQuery = `SELECT *,
+        CASE
+          WHEN balance_due = 0 AND total_amount > 0 THEN 'Paid'
+          WHEN balance_due > 0 AND balance_due < total_amount THEN 'Partial'
+          ELSE 'Pending'
+        END AS status
+      FROM purchase_invoices ${whereClause} ORDER BY issue_date DESC LIMIT ? OFFSET ?`;
     const [rows] = await db.query(dataQuery, [...queryParams, limit, offset]);
 
     return {
@@ -176,7 +201,15 @@ const PurchaseInvoice = {
   },
 
   findById: async (id) => {
-    const [rows] = await db.query('SELECT * FROM purchase_invoices WHERE id = ?', [id]);
+    const [rows] = await db.query(`
+      SELECT *,
+        CASE
+          WHEN balance_due = 0 AND total_amount > 0 THEN 'Paid'
+          WHEN balance_due > 0 AND balance_due < total_amount THEN 'Partial'
+          ELSE 'Pending'
+        END AS status
+      FROM purchase_invoices WHERE id = ?
+    `, [id]);
     return rows.length > 0 ? rows[0] : null;
   },
 

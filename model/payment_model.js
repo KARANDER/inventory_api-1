@@ -52,10 +52,35 @@ const Payment = {
         user_id || null
       ]);
 
-      // 3. ✨ NEW: Update the supplier's total_amount if contact_id exists
+      // 3. Update the supplier's total_amount if contact_id exists
       if (contact_id) {
         const updateSupplierQuery = 'UPDATE supplier_details SET total_amount = total_amount - ? WHERE contact_id = ?';
         await connection.query(updateSupplierQuery, [amount, contact_id]);
+      }
+
+      // 4. FIFO: Apply payment to oldest purchase invoices for this supplier
+      if (contact_id) {
+        // Get supplier code from contacts
+        const [supplierRows] = await connection.query('SELECT code FROM contacts WHERE id = ?', [contact_id]);
+        if (supplierRows.length > 0) {
+          const supplierCode = supplierRows[0].code;
+          // Get unpaid PIs for this supplier, oldest first
+          const [unpaidPIs] = await connection.query(
+            'SELECT id, balance_due FROM purchase_invoices WHERE user = ? AND balance_due > 0 ORDER BY id ASC FOR UPDATE',
+            [supplierCode]
+          );
+          let remainingPayment = parseFloat(amount);
+          for (const pi of unpaidPIs) {
+            if (remainingPayment <= 0) break;
+            const piBalance = parseFloat(pi.balance_due);
+            const deduction = Math.min(remainingPayment, piBalance);
+            await connection.query(
+              'UPDATE purchase_invoices SET balance_due = balance_due - ? WHERE id = ?',
+              [deduction, pi.id]
+            );
+            remainingPayment -= deduction;
+          }
+        }
       }
 
       await connection.commit();
