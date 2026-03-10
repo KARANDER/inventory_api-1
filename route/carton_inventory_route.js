@@ -15,5 +15,7 @@ router.post('/addCarton', checkPermission(permission), cartonInventoryController
 router.post('/getCartonNames', checkPermission(permission), cartonInventoryController.getCartonNames);
 router.post('/updateCarton', checkPermission(permission), cartonInventoryController.updateCarton);
 router.post('/deleteCarton', checkPermission(permission), cartonInventoryController.deleteCarton);
+router.post('/batchUpdate', checkPermission(permission), cartonInventoryController.batchUpdateCartons);
+router.post('/batchDelete', checkPermission(permission), cartonInventoryController.batchDeleteCartons);
 
 module.exports = router;
