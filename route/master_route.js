@@ -14,6 +14,8 @@ router.post('/getAllMaster', checkPermission(permission), masterController.getAl
 router.post('/updateMaster', checkPermission(permission), masterController.updateItem);
 router.post('/deleteMaster', checkPermission(permission), masterController.deleteItem);
 router.post('/getItemCodes', checkPermission(permission), masterController.getItemCodes);
+router.post('/batchUpdate', checkPermission(permission), masterController.batchUpdateItems);
+router.post('/batchDelete', checkPermission(permission), masterController.batchDeleteItems);
 
 
 module.exports = router;

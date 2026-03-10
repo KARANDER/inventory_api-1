@@ -110,5 +110,87 @@ const masterController = {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
   },
+
+  batchUpdateItems: async (req, res) => {
+    try {
+      const items = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        return res.status(400).json({ success: false, message: 'Request body must be a non-empty array.' });
+      }
+
+      const failed = [];
+      const success = [];
+
+      for (const itemData of items) {
+        const { id, ...fieldsToUpdate } = itemData;
+        if (!id) {
+          failed.push({ id: null, message: 'Missing id in update object' });
+          continue;
+        }
+        try {
+          const oldRecord = await MasterItem.findById(id);
+          if (!oldRecord) {
+            failed.push({ id, message: 'Master item not found' });
+            continue;
+          }
+          const affected = await MasterItem.update(id, fieldsToUpdate);
+          if (affected === 0) {
+            failed.push({ id, message: 'Master item not found' });
+          } else {
+            success.push({ id });
+            const changes = compareChanges(oldRecord, fieldsToUpdate);
+            await logUserActivity(req, {
+              model_name: 'master_items',
+              action_type: 'UPDATE',
+              record_id: id,
+              description: 'Updated master item (batch)',
+              changes: changes
+            });
+          }
+        } catch (error) {
+          failed.push({ id, message: error.message });
+        }
+      }
+
+      res.status(200).json({ success: true, updated: success.length, failed });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  batchDeleteItems: async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'Request body must contain ids array.' });
+      }
+
+      let deletedCount = 0;
+      const failed = [];
+
+      for (const id of ids) {
+        try {
+          const affected = await MasterItem.delete(id);
+          if (affected > 0) {
+            deletedCount++;
+            await logUserActivity(req, {
+              model_name: 'master_items',
+              action_type: 'DELETE',
+              record_id: id,
+              description: 'Deleted master item (batch)'
+            });
+          } else {
+            failed.push({ id, message: 'Master item not found' });
+          }
+        } catch (error) {
+          failed.push({ id, message: error.message });
+        }
+      }
+
+      res.status(200).json({ success: true, deletedCount, failed });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
 };
 module.exports = masterController;
