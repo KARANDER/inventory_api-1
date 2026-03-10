@@ -93,7 +93,7 @@ const AccountHistory = {
     if (filters.limit) {
       query += ' LIMIT ?';
       values.push(parseInt(filters.limit));
-      
+
       if (filters.offset) {
         query += ' OFFSET ?';
         values.push(parseInt(filters.offset));
@@ -157,7 +157,7 @@ const AccountHistory = {
     if (filters.limit) {
       query += ' LIMIT ?';
       values.push(parseInt(filters.limit));
-      
+
       if (filters.offset) {
         query += ' OFFSET ?';
         values.push(parseInt(filters.offset));
@@ -259,7 +259,7 @@ const AccountHistory = {
     if (filters.limit) {
       query += ' LIMIT ?';
       values.push(parseInt(filters.limit));
-      
+
       if (filters.offset) {
         query += ' OFFSET ?';
         values.push(parseInt(filters.offset));
@@ -284,6 +284,7 @@ const AccountHistory = {
       FROM account_history ah
       INNER JOIN accounts a ON ah.account_id = a.id
       WHERE a.account_name = ?
+      GROUP BY a.account_name, a.id
     `;
 
     const values = [accountName];
