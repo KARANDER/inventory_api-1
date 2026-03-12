@@ -1,9 +1,9 @@
 const db = require('../config/db');
 const MasterItem = {
   create: async (itemData) => {
-    const { item_code, description, kg_dz, created_by } = itemData;
-    const query = 'INSERT INTO master_items (item_code, description, kg_dz, created_by) VALUES (?, ?, ?, ?)';
-    const [result] = await db.query(query, [item_code, description, kg_dz, created_by]);
+    const { item_code, description, kg_dz, stock_quantity, stock_kg, created_by } = itemData;
+    const query = 'INSERT INTO master_items (item_code, description, kg_dz, stock_quantity, stock_kg, created_by) VALUES (?, ?, ?, ?, ?, ?)';
+    const [result] = await db.query(query, [item_code, description, kg_dz, stock_quantity ?? 0, stock_kg ?? 0, created_by]);
     return { id: result.insertId, ...itemData };
   },
 
@@ -23,9 +23,12 @@ const MasterItem = {
   },
 
   update: async (id, itemData) => {
-    const { item_code, description, kg_dz } = itemData;
-    const query = 'UPDATE master_items SET item_code = ?, description = ?, kg_dz = ? WHERE id = ?';
-    const [result] = await db.query(query, [item_code, description, kg_dz, id]);
+    const allowedFields = ['item_code', 'description', 'kg_dz', 'stock_quantity', 'stock_kg'];
+    const fields = Object.keys(itemData).filter(key => allowedFields.includes(key) && itemData[key] !== undefined);
+    if (fields.length === 0) return 0;
+    const setClauses = fields.map(f => `${f} = ?`).join(', ');
+    const values = fields.map(f => itemData[f]);
+    const [result] = await db.query(`UPDATE master_items SET ${setClauses} WHERE id = ?`, [...values, id]);
     return result.affectedRows;
   },
 
