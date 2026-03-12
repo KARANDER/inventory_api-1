@@ -106,13 +106,29 @@ const cartonInventoryController = {
 
       const failed = [];
       const success = [];
+      const created = [];
 
       for (const itemData of items) {
         const { id, carton_name, carton_quantity, ctn_wt } = itemData;
+
+        // No id = new record, create it
         if (!id) {
-          failed.push({ id: null, message: 'Missing id in update object' });
+          try {
+            const created_by = req.user.id;
+            const newCarton = await CartonInventory.create({ carton_name, carton_quantity, ctn_wt, created_by });
+            created.push({ id: newCarton.id });
+            await logUserActivity(req, {
+              model_name: 'carton_inventory',
+              action_type: 'CREATE',
+              record_id: newCarton.id,
+              description: `Created carton (batch) ${carton_name || ''}`
+            });
+          } catch (error) {
+            failed.push({ id: null, message: error.message });
+          }
           continue;
         }
+
         try {
           const oldRecord = await CartonInventory.findById(id);
           if (!oldRecord) {
@@ -136,7 +152,7 @@ const cartonInventoryController = {
         }
       }
 
-      res.status(200).json({ success: true, updated: success.length, failed });
+      res.status(200).json({ success: true, updated: success.length, created: created.length, failed });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }

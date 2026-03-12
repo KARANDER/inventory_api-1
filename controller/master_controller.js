@@ -120,13 +120,29 @@ const masterController = {
 
       const failed = [];
       const success = [];
+      const created = [];
 
       for (const itemData of items) {
         const { id, ...fieldsToUpdate } = itemData;
+
+        // No id = new record, create it
         if (!id) {
-          failed.push({ id: null, message: 'Missing id in update object' });
+          try {
+            const created_by = req.user.id;
+            const newItem = await MasterItem.create({ ...fieldsToUpdate, created_by });
+            created.push({ id: newItem.id });
+            await logUserActivity(req, {
+              model_name: 'master_items',
+              action_type: 'CREATE',
+              record_id: newItem.id,
+              description: 'Created master item (batch)'
+            });
+          } catch (error) {
+            failed.push({ id: null, message: error.message });
+          }
           continue;
         }
+
         try {
           const oldRecord = await MasterItem.findById(id);
           if (!oldRecord) {
@@ -152,7 +168,7 @@ const masterController = {
         }
       }
 
-      res.status(200).json({ success: true, updated: success.length, failed });
+      res.status(200).json({ success: true, updated: success.length, created: created.length, failed });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }

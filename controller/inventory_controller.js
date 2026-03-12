@@ -144,12 +144,22 @@ const inventoryController = {
       }
       const failed = [];
       const success = [];
+      const created = [];
+
       for (const itemData of items) {
         const { id, ...fieldsToUpdate } = itemData;
+
+        // No id = new record, create it
         if (!id) {
-          failed.push({ id: null, message: "Missing id in update object" });
+          try {
+            const newItem = await InventoryItem.create(fieldsToUpdate);
+            created.push({ id: newItem.id });
+          } catch (error) {
+            failed.push({ id: null, message: error.message });
+          }
           continue;
         }
+
         try {
           const affected = await InventoryItem.update(id, fieldsToUpdate);
           if (affected === 0) {
@@ -161,7 +171,7 @@ const inventoryController = {
           failed.push({ id, message: error.message });
         }
       }
-      res.status(200).json({ success: true, updated: success.length, failed });
+      res.status(200).json({ success: true, updated: success.length, created: created.length, failed });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }

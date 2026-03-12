@@ -120,11 +120,32 @@ const salesOrderController = {
 
       const failed = [];
       const success = [];
+      const created = [];
 
       for (const orderData of orders) {
         const { id, ...fieldsToUpdate } = orderData;
+
+        // No id = new record, create it
         if (!id) {
-          failed.push({ id: null, message: "Missing id in update object" });
+          try {
+            const created_by = req.user.id;
+            const { date, ...restFields } = fieldsToUpdate;
+            const newOrderData = {
+              ...restFields,
+              order_date: date || restFields.order_date,
+              created_by
+            };
+            const newOrder = await SalesOrder.create(newOrderData);
+            created.push({ id: newOrder.id });
+            await logUserActivity(req, {
+              model_name: 'sales_orders',
+              action_type: 'CREATE',
+              record_id: newOrder.id,
+              description: 'Created sales order (batch)'
+            });
+          } catch (error) {
+            failed.push({ id: null, message: error.message });
+          }
           continue;
         }
 
@@ -162,7 +183,7 @@ const salesOrderController = {
         }
       }
 
-      res.status(200).json({ success: true, updated: success.length, failed });
+      res.status(200).json({ success: true, updated: success.length, created: created.length, failed });
 
     } catch (error) {
       res.status(500).json({ success: false, message: "Server Error", error: error.message });
