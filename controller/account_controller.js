@@ -95,6 +95,61 @@ const accountController = {
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
+  },
+
+  // Delete all Bank and Cash accounts
+  deleteAllBankCashAccounts: async (req, res) => {
+    try {
+      const result = await Account.deleteAllBankCash();
+      await logUserActivity(req, {
+        model_name: 'accounts',
+        action_type: 'DELETE',
+        description: `Deleted all Bank and Cash accounts (${result.deletedCount} records)`
+      });
+      res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${result.deletedCount} Bank and Cash accounts`,
+        deletedCount: result.deletedCount
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  // Batch delete multiple accounts by IDs
+  batchDeleteAccounts: async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'Request body must contain ids array.' });
+      }
+
+      let deletedCount = 0;
+      const failed = [];
+
+      for (const id of ids) {
+        try {
+          const affected = await Account.delete(id);
+          if (affected > 0) {
+            deletedCount++;
+            await logUserActivity(req, {
+              model_name: 'accounts',
+              action_type: 'DELETE',
+              record_id: id,
+              description: 'Deleted account (batch)'
+            });
+          } else {
+            failed.push({ id, message: 'Account not found' });
+          }
+        } catch (error) {
+          failed.push({ id, message: error.message });
+        }
+      }
+
+      res.status(200).json({ success: true, deletedCount, failed });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
   }
 };
 module.exports = accountController;

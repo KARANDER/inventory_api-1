@@ -10,4 +10,11 @@ router.post('/getAllReceipt', [authMiddleware, checkPermission('receipts')], rec
 router.post('/updateReceipt', [authMiddleware, checkPermission('receipts'), upload.single('image')], receiptController.updateReceipt);
 
 router.post('/deleteReceipt', [authMiddleware, checkPermission('receipts')], receiptController.deleteReceipt);
+
+// Delete all receipts
+router.post('/deleteAllReceipts', [authMiddleware, checkPermission('receipts')], receiptController.deleteAllReceipts);
+
+// Batch delete multiple receipts by IDs
+router.post('/batchDeleteReceipts', [authMiddleware, checkPermission('receipts')], receiptController.batchDeleteReceipts);
+
 module.exports = router;

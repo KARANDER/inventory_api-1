@@ -20,5 +20,13 @@ router.post('/deleteContact', [authMiddleware, checkPermission('contacts')], con
 // Add this line after your existing routes
 router.post('/getAllContactCodes', [authMiddleware, checkPermission('contacts')], contactController.getAllContactCodes);
 
+// Delete all customers
+router.post('/deleteAllCustomers', [authMiddleware, checkPermission('contacts')], contactController.deleteAllCustomers);
+
+// Delete all suppliers
+router.post('/deleteAllSuppliers', [authMiddleware, checkPermission('contacts')], contactController.deleteAllSuppliers);
+
+// Batch delete multiple contacts by IDs
+router.post('/batchDeleteContacts', [authMiddleware, checkPermission('contacts')], contactController.batchDeleteContacts);
 
 module.exports = router;

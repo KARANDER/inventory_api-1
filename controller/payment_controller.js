@@ -81,5 +81,56 @@ const paymentController = {
     }
   },
 
+  // Delete all payments
+  deleteAllPayments: async (req, res) => {
+    try {
+      const result = await Payment.deleteAll();
+      await logUserActivity(req, {
+        model_name: 'payments',
+        action_type: 'DELETE',
+        description: `Deleted all payments (${result.deletedCount} records)`
+      });
+      res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${result.deletedCount} payments`,
+        deletedCount: result.deletedCount
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  // Batch delete multiple payments by IDs
+  batchDeletePayments: async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'Request body must contain ids array.' });
+      }
+
+      let deletedCount = 0;
+      const failed = [];
+
+      for (const id of ids) {
+        try {
+          await Payment.delete(id);
+          deletedCount++;
+          await logUserActivity(req, {
+            model_name: 'payments',
+            action_type: 'DELETE',
+            record_id: id,
+            description: 'Deleted payment (batch)'
+          });
+        } catch (error) {
+          failed.push({ id, message: error.message });
+        }
+      }
+
+      res.status(200).json({ success: true, deletedCount, failed });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  }
+
 };
 module.exports = paymentController;

@@ -131,6 +131,79 @@ const contactController = {
     }
   },
 
+  // Delete all customers (contacts with type='Customer')
+  deleteAllCustomers: async (req, res) => {
+    try {
+      const result = await Contact.deleteAllCustomers();
+      await logUserActivity(req, {
+        model_name: 'contacts',
+        action_type: 'DELETE',
+        description: `Deleted all customers (${result.deletedCount} records)`
+      });
+      res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${result.deletedCount} customers`,
+        deletedCount: result.deletedCount
+      });
+    } catch (error) {
+      console.error('Delete All Customers Error:', error);
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  // Delete all suppliers (contacts with type='Supplier')
+  deleteAllSuppliers: async (req, res) => {
+    try {
+      const result = await Contact.deleteAllSuppliers();
+      await logUserActivity(req, {
+        model_name: 'contacts',
+        action_type: 'DELETE',
+        description: `Deleted all suppliers (${result.deletedCount} records)`
+      });
+      res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${result.deletedCount} suppliers`,
+        deletedCount: result.deletedCount
+      });
+    } catch (error) {
+      console.error('Delete All Suppliers Error:', error);
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  // Batch delete multiple contacts by IDs
+  batchDeleteContacts: async (req, res) => {
+    try {
+      const { ids } = req.body;
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({ success: false, message: 'Request body must contain ids array.' });
+      }
+
+      let deletedCount = 0;
+      const failed = [];
+
+      for (const id of ids) {
+        try {
+          await Contact.delete(id);
+          deletedCount++;
+          await logUserActivity(req, {
+            model_name: 'contacts',
+            action_type: 'DELETE',
+            record_id: id,
+            description: 'Deleted contact (batch)'
+          });
+        } catch (error) {
+          failed.push({ id, message: error.message });
+        }
+      }
+
+      res.status(200).json({ success: true, deletedCount, failed });
+    } catch (error) {
+      console.error('Batch Delete Contacts Error:', error);
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  }
+
 };
 
 module.exports = contactController;

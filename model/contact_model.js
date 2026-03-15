@@ -255,6 +255,94 @@ const Contact = {
     return rows;
   },
 
+  // Delete all customers (contacts with type='Customer')
+  deleteAllCustomers: async () => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Get count before deleting
+      const [countResult] = await connection.query(
+        "SELECT COUNT(*) as count FROM contacts WHERE type = 'Customer'"
+      );
+      const count = countResult[0].count;
+
+      // Get customer IDs
+      const [customerIds] = await connection.query(
+        "SELECT id FROM contacts WHERE type = 'Customer'"
+      );
+
+      if (customerIds.length > 0) {
+        const ids = customerIds.map(row => row.id);
+        const placeholders = ids.map(() => '?').join(',');
+
+        // Delete customer_details
+        await connection.query(
+          `DELETE FROM customer_details WHERE contact_id IN (${placeholders})`,
+          ids
+        );
+
+        // Delete contacts
+        await connection.query(
+          `DELETE FROM contacts WHERE id IN (${placeholders})`,
+          ids
+        );
+      }
+
+      await connection.commit();
+      return { deletedCount: count };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  // Delete all suppliers (contacts with type='Supplier')
+  deleteAllSuppliers: async () => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Get count before deleting
+      const [countResult] = await connection.query(
+        "SELECT COUNT(*) as count FROM contacts WHERE type = 'Supplier'"
+      );
+      const count = countResult[0].count;
+
+      // Get supplier IDs
+      const [supplierIds] = await connection.query(
+        "SELECT id FROM contacts WHERE type = 'Supplier'"
+      );
+
+      if (supplierIds.length > 0) {
+        const ids = supplierIds.map(row => row.id);
+        const placeholders = ids.map(() => '?').join(',');
+
+        // Delete supplier_details
+        await connection.query(
+          `DELETE FROM supplier_details WHERE contact_id IN (${placeholders})`,
+          ids
+        );
+
+        // Delete contacts
+        await connection.query(
+          `DELETE FROM contacts WHERE id IN (${placeholders})`,
+          ids
+        );
+      }
+
+      await connection.commit();
+      return { deletedCount: count };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
   // Paginated search with multi-term support and type filter
   findAllPaginated: async ({ page = 1, limit = 10, search = '', type = '' }) => {
     const offset = (page - 1) * limit;

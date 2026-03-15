@@ -16,4 +16,10 @@ router.post('/getAllAccount', checkPermission(permission), accountController.get
 router.post('/updateAccount', checkPermission(permission), accountController.updateAccount);
 router.post('/deleteAccount', checkPermission(permission), accountController.deleteAccount);
 
+// Delete all Bank and Cash accounts
+router.post('/deleteAllBankCashAccounts', checkPermission(permission), accountController.deleteAllBankCashAccounts);
+
+// Batch delete multiple accounts by IDs
+router.post('/batchDeleteAccounts', checkPermission(permission), accountController.batchDeleteAccounts);
+
 module.exports = router;

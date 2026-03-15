@@ -40,6 +40,38 @@ const Account = {
     return result.affectedRows;
   },
 
+  // Delete all Bank and Cash accounts
+  deleteAllBankCash: async () => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Get count before deleting
+      const [countResult] = await connection.query(
+        "SELECT COUNT(*) as count FROM accounts WHERE account_name IN ('Bank', 'Cash')"
+      );
+      const count = countResult[0].count;
+
+      // Delete account history for these accounts
+      await connection.query(
+        "DELETE FROM account_history WHERE account_id IN (SELECT id FROM accounts WHERE account_name IN ('Bank', 'Cash'))"
+      );
+
+      // Delete the accounts
+      await connection.query(
+        "DELETE FROM accounts WHERE account_name IN ('Bank', 'Cash')"
+      );
+
+      await connection.commit();
+      return { deletedCount: count };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
   // Paginated search with multi-term support
   findAllPaginated: async ({ page = 1, limit = 10, search = '' }) => {
     const offset = (page - 1) * limit;

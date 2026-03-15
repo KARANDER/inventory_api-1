@@ -43,6 +43,7 @@ const paymentMethodRoutes = require('./route/payment_method_route');
 const journalEntryRoutes = require('./route/journal_entry_route');
 const journalCustomerRoutes = require('./route/journal_customer_route');
 const backupRoutes = require('./route/backup_route');
+const databaseRoutes = require('./route/database_route');
 
 const PORT = process.env.PORT || 3000;
 
@@ -73,6 +74,7 @@ app.use('/payment-methods', paymentMethodRoutes);
 app.use('/journal-entries', journalEntryRoutes);
 app.use('/journal-entries/customers', journalCustomerRoutes);
 app.use('/backup', backupRoutes);
+app.use('/database', databaseRoutes);
 
 // An async function to connect to the DB and then start the server
 const startServer = async () => {

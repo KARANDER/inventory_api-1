@@ -227,6 +227,43 @@ const Receipt = {
     }
   },
 
+  // Delete all receipts
+  deleteAll: async () => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // Get count before deleting
+      const [countResult] = await connection.query('SELECT COUNT(*) as count FROM receipts');
+      const count = countResult[0].count;
+
+      // Reverse all account balances
+      await connection.query(`
+        UPDATE accounts a
+        INNER JOIN (
+          SELECT account_id, SUM(amount) as total_amount
+          FROM receipts
+          GROUP BY account_id
+        ) r ON a.id = r.account_id
+        SET a.balance = a.balance - r.total_amount
+      `);
+
+      // Delete all account history records for receipts
+      await connection.query('DELETE FROM account_history WHERE receipt_id IS NOT NULL');
+
+      // Delete all receipts
+      await connection.query('DELETE FROM receipts');
+
+      await connection.commit();
+      return { deletedCount: count };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
   // Paginated search with multi-term support
   findAllPaginated: async ({ page = 1, limit = 10, search = '' }) => {
     const offset = (page - 1) * limit;
