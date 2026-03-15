@@ -16,4 +16,7 @@ router.post('/deleteAllPayments', [authMiddleware, checkPermission('payments')],
 // Batch delete multiple payments by IDs
 router.post('/batchDeletePayments', [authMiddleware, checkPermission('payments')], paymentController.batchDeletePayments);
 
+// Delete all payments by contact_id
+router.post('/deletePaymentsByContactId', [authMiddleware, checkPermission('payments')], paymentController.deletePaymentsByContactId);
+
 module.exports = router;

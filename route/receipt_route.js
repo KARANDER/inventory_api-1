@@ -17,4 +17,7 @@ router.post('/deleteAllReceipts', [authMiddleware, checkPermission('receipts')],
 // Batch delete multiple receipts by IDs
 router.post('/batchDeleteReceipts', [authMiddleware, checkPermission('receipts')], receiptController.batchDeleteReceipts);
 
+// Delete all receipts by contact_id
+router.post('/deleteReceiptsByContactId', [authMiddleware, checkPermission('receipts')], receiptController.deleteReceiptsByContactId);
+
 module.exports = router;

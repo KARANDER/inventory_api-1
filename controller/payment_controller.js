@@ -68,7 +68,10 @@ const paymentController = {
   deletePayment: async (req, res) => {
     try {
       const paymentId = req.body.id;
-      await Payment.delete(paymentId);
+      const affectedRows = await Payment.delete(paymentId);
+      if (affectedRows === 0) {
+        return res.status(404).json({ success: false, message: 'Payment not found' });
+      }
       await logUserActivity(req, {
         model_name: 'payments',
         action_type: 'DELETE',
@@ -113,20 +116,49 @@ const paymentController = {
 
       for (const id of ids) {
         try {
-          await Payment.delete(id);
-          deletedCount++;
-          await logUserActivity(req, {
-            model_name: 'payments',
-            action_type: 'DELETE',
-            record_id: id,
-            description: 'Deleted payment (batch)'
-          });
+          const affectedRows = await Payment.delete(id);
+          if (affectedRows === 0) {
+            failed.push({ id, message: 'Payment not found' });
+          } else {
+            deletedCount++;
+            await logUserActivity(req, {
+              model_name: 'payments',
+              action_type: 'DELETE',
+              record_id: id,
+              description: 'Deleted payment (batch)'
+            });
+          }
         } catch (error) {
           failed.push({ id, message: error.message });
         }
       }
 
       res.status(200).json({ success: true, deletedCount, failed });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  deletePaymentsByContactId: async (req, res) => {
+    try {
+      const { contact_id } = req.body;
+      if (!contact_id) {
+        return res.status(400).json({ success: false, message: 'contact_id is required.' });
+      }
+
+      const result = await Payment.deleteByContactId(contact_id);
+      await logUserActivity(req, {
+        model_name: 'payments',
+        action_type: 'DELETE',
+        description: `Deleted payments by contact_id ${contact_id} (${result.deletedCount} records)`
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${result.deletedCount} payments for contact_id ${contact_id}`,
+        contact_id,
+        deletedCount: result.deletedCount
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }

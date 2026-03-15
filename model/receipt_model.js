@@ -192,33 +192,10 @@ const Receipt = {
     try {
       await connection.beginTransaction();
 
-      // Get receipt info before deleting to reverse account balance
-      const [receiptRows] = await connection.query(
-        'SELECT account_id, amount FROM receipts WHERE id = ?',
-        [id]
-      );
-
-      if (receiptRows.length > 0) {
-        const { account_id, amount } = receiptRows[0];
-
-        // Reverse the account balance (subtract the amount that was added)
-        await connection.query(
-          'UPDATE accounts SET balance = balance - ? WHERE id = ?',
-          [amount, account_id]
-        );
-
-        // Delete account history record
-        await connection.query(
-          'DELETE FROM account_history WHERE receipt_id = ?',
-          [id]
-        );
-      }
-
-      // Delete the receipt
-      const deleteQuery = 'DELETE FROM receipts WHERE id = ?';
-      await connection.query(deleteQuery, [id]);
+      const [result] = await connection.query('DELETE FROM receipts WHERE id = ?', [id]);
 
       await connection.commit();
+      return result.affectedRows;
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -237,22 +214,31 @@ const Receipt = {
       const [countResult] = await connection.query('SELECT COUNT(*) as count FROM receipts');
       const count = countResult[0].count;
 
-      // Reverse all account balances
-      await connection.query(`
-        UPDATE accounts a
-        INNER JOIN (
-          SELECT account_id, SUM(amount) as total_amount
-          FROM receipts
-          GROUP BY account_id
-        ) r ON a.id = r.account_id
-        SET a.balance = a.balance - r.total_amount
-      `);
-
-      // Delete all account history records for receipts
-      await connection.query('DELETE FROM account_history WHERE receipt_id IS NOT NULL');
-
       // Delete all receipts
       await connection.query('DELETE FROM receipts');
+
+      await connection.commit();
+      return { deletedCount: count };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  deleteByContactId: async (contactId) => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [countResult] = await connection.query(
+        'SELECT COUNT(*) as count FROM receipts WHERE contact_id = ?',
+        [contactId]
+      );
+      const count = countResult[0].count;
+
+      await connection.query('DELETE FROM receipts WHERE contact_id = ?', [contactId]);
 
       await connection.commit();
       return { deletedCount: count };

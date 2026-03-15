@@ -68,7 +68,10 @@ const receiptController = {
   deleteReceipt: async (req, res) => {
     try {
       const receiptId = req.body.id;
-      await Receipt.delete(receiptId);
+      const affectedRows = await Receipt.delete(receiptId);
+      if (affectedRows === 0) {
+        return res.status(404).json({ success: false, message: 'Receipt not found' });
+      }
       await logUserActivity(req, {
         model_name: 'receipts',
         action_type: 'DELETE',
@@ -113,20 +116,49 @@ const receiptController = {
 
       for (const id of ids) {
         try {
-          await Receipt.delete(id);
-          deletedCount++;
-          await logUserActivity(req, {
-            model_name: 'receipts',
-            action_type: 'DELETE',
-            record_id: id,
-            description: 'Deleted receipt (batch)'
-          });
+          const affectedRows = await Receipt.delete(id);
+          if (affectedRows === 0) {
+            failed.push({ id, message: 'Receipt not found' });
+          } else {
+            deletedCount++;
+            await logUserActivity(req, {
+              model_name: 'receipts',
+              action_type: 'DELETE',
+              record_id: id,
+              description: 'Deleted receipt (batch)'
+            });
+          }
         } catch (error) {
           failed.push({ id, message: error.message });
         }
       }
 
       res.status(200).json({ success: true, deletedCount, failed });
+    } catch (error) {
+      res.status(500).json({ success: false, message: "Server Error", error: error.message });
+    }
+  },
+
+  deleteReceiptsByContactId: async (req, res) => {
+    try {
+      const { contact_id } = req.body;
+      if (!contact_id) {
+        return res.status(400).json({ success: false, message: 'contact_id is required.' });
+      }
+
+      const result = await Receipt.deleteByContactId(contact_id);
+      await logUserActivity(req, {
+        model_name: 'receipts',
+        action_type: 'DELETE',
+        description: `Deleted receipts by contact_id ${contact_id} (${result.deletedCount} records)`
+      });
+
+      res.status(200).json({
+        success: true,
+        message: `Successfully deleted ${result.deletedCount} receipts for contact_id ${contact_id}`,
+        contact_id,
+        deletedCount: result.deletedCount
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: "Server Error", error: error.message });
     }

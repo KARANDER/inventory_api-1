@@ -132,34 +132,10 @@ const Payment = {
     try {
       await connection.beginTransaction();
 
-      // Get payment info before deleting to reverse account balance
-      const [paymentRows] = await connection.query(
-        'SELECT account_id, amount FROM payments WHERE id = ?',
-        [id]
-      );
-
-      if (paymentRows.length > 0) {
-        const { account_id, amount } = paymentRows[0];
-
-        // Reverse the account balance (add back the amount that was subtracted)
-        await connection.query(
-          'UPDATE accounts SET balance = balance + ? WHERE id = ?',
-          [amount, account_id]
-        );
-
-        // Delete account history record
-        await connection.query(
-          'DELETE FROM account_history WHERE payment_id = ?',
-          [id]
-        );
-      }
-
-      // Delete the payment
-      const deleteQuery = 'DELETE FROM payments WHERE id = ?';
-      await connection.query(deleteQuery, [id]);
+      const [result] = await connection.query('DELETE FROM payments WHERE id = ?', [id]);
 
       await connection.commit();
-      return;
+      return result.affectedRows;
     } catch (error) {
       await connection.rollback();
       throw error;
@@ -178,22 +154,31 @@ const Payment = {
       const [countResult] = await connection.query('SELECT COUNT(*) as count FROM payments');
       const count = countResult[0].count;
 
-      // Reverse all account balances (add back amounts that were subtracted)
-      await connection.query(`
-        UPDATE accounts a
-        INNER JOIN (
-          SELECT account_id, SUM(amount) as total_amount
-          FROM payments
-          GROUP BY account_id
-        ) p ON a.id = p.account_id
-        SET a.balance = a.balance + p.total_amount
-      `);
-
-      // Delete all account history records for payments
-      await connection.query('DELETE FROM account_history WHERE payment_id IS NOT NULL');
-
       // Delete all payments
       await connection.query('DELETE FROM payments');
+
+      await connection.commit();
+      return { deletedCount: count };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
+  deleteByContactId: async (contactId) => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [countResult] = await connection.query(
+        'SELECT COUNT(*) as count FROM payments WHERE contact_id = ?',
+        [contactId]
+      );
+      const count = countResult[0].count;
+
+      await connection.query('DELETE FROM payments WHERE contact_id = ?', [contactId]);
 
       await connection.commit();
       return { deletedCount: count };
