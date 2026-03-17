@@ -1,4 +1,6 @@
 const MasterItem = require('../model/master_model');
+const InventoryItem = require('../model/inventory_model');
+const db = require('../config/db');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
 
@@ -204,6 +206,107 @@ const masterController = {
       }
 
       res.status(200).json({ success: true, deletedCount, failed });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
+  createInventoryFromMaster: async (req, res) => {
+    try {
+      const { customer_code, item_codes } = req.body;
+
+      if (!customer_code || typeof customer_code !== 'string') {
+        return res.status(400).json({ success: false, message: 'customer_code is required.' });
+      }
+
+      if (!Array.isArray(item_codes) || item_codes.length === 0) {
+        return res.status(400).json({ success: false, message: 'item_codes must be a non-empty array.' });
+      }
+
+      const normalizedCustomerCode = customer_code.trim();
+      const normalizedItemCodes = [...new Set(item_codes
+        .filter(code => typeof code === 'string')
+        .map(code => code.trim())
+        .filter(Boolean))];
+
+      if (!normalizedCustomerCode) {
+        return res.status(400).json({ success: false, message: 'customer_code cannot be empty.' });
+      }
+
+      if (normalizedItemCodes.length === 0) {
+        return res.status(400).json({ success: false, message: 'item_codes must contain valid item codes.' });
+      }
+
+      const [contactRows] = await db.query(
+        'SELECT id FROM contacts WHERE code = ? AND type = "Customer" LIMIT 1',
+        [normalizedCustomerCode]
+      );
+
+      if (contactRows.length === 0) {
+        return res.status(404).json({ success: false, message: 'Customer not found for provided customer_code.' });
+      }
+
+      const created = [];
+      const skipped = [];
+      const failed = [];
+
+      for (const itemCode of normalizedItemCodes) {
+        try {
+          const codeUser = `${itemCode}${normalizedCustomerCode}`;
+
+          const [existingRows] = await db.query(
+            'SELECT id FROM inventory_items WHERE code_user = ? LIMIT 1',
+            [codeUser]
+          );
+
+          if (existingRows.length > 0) {
+            skipped.push({ item_code: itemCode, reason: 'Already exists for this customer' });
+            continue;
+          }
+
+          const [masterRows] = await db.query(
+            'SELECT item_code, description, kg_dz FROM master_items WHERE item_code = ? LIMIT 1',
+            [itemCode]
+          );
+
+          if (masterRows.length === 0) {
+            failed.push({ item_code: itemCode, message: 'Master item not found' });
+            continue;
+          }
+
+          const masterItem = masterRows[0];
+          const createdItem = await InventoryItem.create({
+            item_code: masterItem.item_code,
+            user: normalizedCustomerCode,
+            code_user: codeUser,
+            description: masterItem.description,
+            kg_dzn: masterItem.kg_dz,
+            stock_quantity: 0,
+            created_by: req.user.id
+          });
+
+          created.push({ id: createdItem.id, item_code: masterItem.item_code });
+        } catch (error) {
+          failed.push({ item_code: itemCode, message: error.message });
+        }
+      }
+
+      await logUserActivity(req, {
+        model_name: 'inventory_items',
+        action_type: 'CREATE',
+        description: `Created inventory from master for ${normalizedCustomerCode} (created: ${created.length}, skipped: ${skipped.length}, failed: ${failed.length})`
+      });
+
+      res.status(200).json({
+        success: true,
+        customer_code: normalizedCustomerCode,
+        createdCount: created.length,
+        skippedCount: skipped.length,
+        failedCount: failed.length,
+        created,
+        skipped,
+        failed
+      });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }

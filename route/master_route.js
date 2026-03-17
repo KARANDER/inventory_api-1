@@ -16,6 +16,7 @@ router.post('/deleteMaster', checkPermission(permission), masterController.delet
 router.post('/getItemCodes', checkPermission(permission), masterController.getItemCodes);
 router.post('/batchUpdate', checkPermission(permission), masterController.batchUpdateItems);
 router.post('/batchDelete', checkPermission(permission), masterController.batchDeleteItems);
+router.post('/createInventoryFromMaster', checkPermission(permission), masterController.createInventoryFromMaster);
 
 
 module.exports = router;
