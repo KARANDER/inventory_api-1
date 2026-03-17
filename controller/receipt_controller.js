@@ -150,14 +150,17 @@ const receiptController = {
       await logUserActivity(req, {
         model_name: 'receipts',
         action_type: 'DELETE',
-        description: `Deleted receipts by contact_id ${contact_id} (${result.deletedCount} records)`
+        description: `Deleted receipts by contact_id ${contact_id} (${result.deletedReceipts} receipts, ${result.deletedSalesInvoices} sales invoices)`
       });
 
       res.status(200).json({
         success: true,
-        message: `Successfully deleted ${result.deletedCount} receipts for contact_id ${contact_id}`,
+        message: `Deleted ${result.deletedReceipts} receipts and ${result.deletedSalesInvoices} sales invoices for contact_id ${contact_id}`,
         contact_id,
-        deletedCount: result.deletedCount
+        contact_code: result.contactCode,
+        deletedCount: result.deletedCount,
+        deletedReceipts: result.deletedReceipts,
+        deletedSalesInvoices: result.deletedSalesInvoices
       });
     } catch (error) {
       res.status(500).json({ success: false, message: "Server Error", error: error.message });

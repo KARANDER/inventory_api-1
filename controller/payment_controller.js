@@ -150,14 +150,17 @@ const paymentController = {
       await logUserActivity(req, {
         model_name: 'payments',
         action_type: 'DELETE',
-        description: `Deleted payments by contact_id ${contact_id} (${result.deletedCount} records)`
+        description: `Deleted payments by contact_id ${contact_id} (${result.deletedPayments} payments, ${result.deletedPurchaseInvoices} purchase invoices)`
       });
 
       res.status(200).json({
         success: true,
-        message: `Successfully deleted ${result.deletedCount} payments for contact_id ${contact_id}`,
+        message: `Deleted ${result.deletedPayments} payments and ${result.deletedPurchaseInvoices} purchase invoices for contact_id ${contact_id}`,
         contact_id,
-        deletedCount: result.deletedCount
+        contact_code: result.contactCode,
+        deletedCount: result.deletedCount,
+        deletedPayments: result.deletedPayments,
+        deletedPurchaseInvoices: result.deletedPurchaseInvoices
       });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });

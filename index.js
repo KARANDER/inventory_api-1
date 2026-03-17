@@ -54,6 +54,7 @@ app.use('/account-history', accountHistoryRoutes);
 app.use('/contacts', contactRoutes);
 app.use('/receipts', receiptRoutes);
 app.use('/payments', paymentRoutes);
+app.use('/payment', paymentRoutes);
 app.use('/master-items', masterRoutes);
 app.use('/inventory-items', inventoryRoutes);
 app.use('/stock-history', stockHistoryRoutes);

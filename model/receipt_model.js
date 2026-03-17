@@ -232,16 +232,40 @@ const Receipt = {
     try {
       await connection.beginTransaction();
 
-      const [countResult] = await connection.query(
+      const [contactRows] = await connection.query(
+        'SELECT code FROM contacts WHERE id = ? LIMIT 1',
+        [contactId]
+      );
+      const contactCode = contactRows.length > 0 ? contactRows[0].code : null;
+
+      const [receiptCountResult] = await connection.query(
         'SELECT COUNT(*) as count FROM receipts WHERE contact_id = ?',
         [contactId]
       );
-      const count = countResult[0].count;
+      const deletedReceipts = receiptCountResult[0].count;
+
+      let deletedSalesInvoices = 0;
+      if (contactCode) {
+        const [invoiceCountResult] = await connection.query(
+          'SELECT COUNT(*) as count FROM invoices WHERE customer_id = ?',
+          [contactCode]
+        );
+        deletedSalesInvoices = invoiceCountResult[0].count;
+      }
 
       await connection.query('DELETE FROM receipts WHERE contact_id = ?', [contactId]);
 
+      if (contactCode) {
+        await connection.query('DELETE FROM invoices WHERE customer_id = ?', [contactCode]);
+      }
+
       await connection.commit();
-      return { deletedCount: count };
+      return {
+        deletedCount: deletedReceipts,
+        deletedReceipts,
+        deletedSalesInvoices,
+        contactCode
+      };
     } catch (error) {
       await connection.rollback();
       throw error;
