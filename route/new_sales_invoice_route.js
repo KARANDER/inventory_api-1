@@ -13,6 +13,7 @@ router.post('/', [authMiddleware, checkPermission('sales_invoices')], invoiceCon
 router.post('/getAllInvoices', [authMiddleware, checkPermission('sales_invoices')], invoiceController.getAllInvoices);
 router.post('/updateInvoice', [authMiddleware, checkPermission('sales_invoices')], invoiceController.updateInvoice);
 router.post('/deleteInvoice', [authMiddleware, checkPermission('sales_invoices')], invoiceController.deleteInvoice);
+router.post('/undoInvoice', [authMiddleware, checkPermission('sales_invoices')], invoiceController.undoInvoice);
 router.post('/batchDeleteInvoices', [authMiddleware, checkPermission('sales_invoices')], invoiceController.batchDeleteInvoices);
 // router.post('/getInvoiceList',[authMiddleware, checkPermission('sales_invoices')], invoiceController.getInvoiceList);
 router.post(

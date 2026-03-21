@@ -315,6 +315,155 @@ const Invoice = {
     return result.affectedRows;
   },
 
+  undoInvoice: async (id, undoByUserId = null, undoReason = null) => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      const [invoiceRows] = await connection.query(
+        `SELECT id, invoice_number, invoice_date, customer_id, reference_no_1, reference_no_2, grand_total
+         FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE`,
+        [id]
+      );
+
+      if (invoiceRows.length === 0) {
+        await connection.rollback();
+        return { success: false, message: 'Invoice not found' };
+      }
+
+      const invoice = invoiceRows[0];
+
+      const [items] = await connection.query(
+        `SELECT item_code, item_finish, total_pcs, net_kg
+         FROM invoice_items WHERE invoice_id = ? FOR UPDATE`,
+        [id]
+      );
+
+      const [cartons] = await connection.query(
+        `SELECT carton_number FROM shipping_cartons WHERE invoice_id = ? FOR UPDATE`,
+        [id]
+      );
+
+      // 1) Reverse carton inventory
+      const cartonCounts = {};
+      for (const carton of cartons) {
+        if (!carton.carton_number) continue;
+        cartonCounts[carton.carton_number] = (cartonCounts[carton.carton_number] || 0) + 1;
+      }
+      for (const cartonName of Object.keys(cartonCounts)) {
+        await connection.query(
+          'UPDATE carton_inventory SET carton_quantity = carton_quantity + ? WHERE carton_name = ?',
+          [cartonCounts[cartonName], cartonName]
+        );
+      }
+
+      // 2) Reverse stock + stock history + sales_orders quantity
+      for (const item of items) {
+        const itemCode = item.item_code;
+        const itemFinish = item.item_finish;
+        const totalPcs = parseFloat(item.total_pcs) || 0;
+        const totalKg = parseFloat(item.net_kg) || 0;
+
+        if (!itemCode || totalPcs <= 0) continue;
+
+        await connection.query(
+          `UPDATE master_items
+           SET stock_quantity = stock_quantity + ?,
+               stock_kg = COALESCE(stock_kg, 0) + ?
+           WHERE item_code = ?`,
+          [totalPcs, totalKg, itemCode]
+        );
+
+        await connection.query(
+          `INSERT INTO stock_history
+          (item_code, transaction_type, invoice_type, invoice_number,
+           quantity_pcs, quantity_kg, movement_date, note, user_id)
+          VALUES (?, 'CREDIT', 'UNDO_SALES', ?, ?, ?, ?, ?, ?)`,
+          [
+            itemCode,
+            invoice.invoice_number || null,
+            totalPcs,
+            totalKg,
+            new Date(),
+            undoReason || `Undo invoice ${invoice.invoice_number || id}`,
+            undoByUserId || null
+          ]
+        );
+
+        if (itemFinish) {
+          let remainingRestore = totalPcs;
+          const [salesOrders] = await connection.query(
+            `SELECT id, quantity_pcs, initial_qty
+             FROM sales_orders
+             WHERE item_code = ? AND finish = ?
+             ORDER BY id ASC
+             FOR UPDATE`,
+            [itemCode, itemFinish]
+          );
+
+          for (const order of salesOrders) {
+            if (remainingRestore <= 0) break;
+
+            const currentQty = parseFloat(order.quantity_pcs) || 0;
+            const initialQtyRaw = order.initial_qty;
+            const maxQty = initialQtyRaw == null ? currentQty + remainingRestore : parseFloat(initialQtyRaw) || 0;
+            const canRestore = Math.max(maxQty - currentQty, 0);
+            if (canRestore <= 0) continue;
+
+            const addQty = Math.min(remainingRestore, canRestore);
+            await connection.query(
+              'UPDATE sales_orders SET quantity_pcs = quantity_pcs + ? WHERE id = ?',
+              [addQty, order.id]
+            );
+            remainingRestore -= addQty;
+          }
+        }
+      }
+
+      // 3) Reverse customer totals
+      const customerCode = invoice.customer_id;
+      const grandTotal = parseFloat(invoice.grand_total) || 0;
+      const refNo1 = parseFloat(invoice.reference_no_1) || 0;
+      const refNo2 = parseFloat(invoice.reference_no_2) || 0;
+
+      if (customerCode) {
+        const [contactRows] = await connection.query(
+          'SELECT id FROM contacts WHERE code = ? AND type = "Customer" LIMIT 1',
+          [customerCode]
+        );
+
+        if (contactRows.length > 0) {
+          const contactId = contactRows[0].id;
+          await connection.query(
+            `UPDATE customer_details
+             SET total_amount = COALESCE(total_amount, 0) - ?,
+                 no_1 = COALESCE(no_1, 0) - ?,
+                 no_2 = COALESCE(no_2, 0) - ?
+             WHERE contact_id = ?`,
+            [grandTotal, refNo1, refNo2, contactId]
+          );
+        }
+      }
+
+      // 4) Finally hard delete invoice row (children auto-delete via FK)
+      const [deleteResult] = await connection.query('DELETE FROM invoices WHERE id = ?', [id]);
+
+      await connection.commit();
+      return {
+        success: true,
+        deletedCount: deleteResult.affectedRows,
+        reversedItems: items.length,
+        reversedCartons: cartons.length,
+        invoice_number: invoice.invoice_number
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
   getInvoiceSummary: async () => {
     // Unchanged
     const currentDate = new Date();

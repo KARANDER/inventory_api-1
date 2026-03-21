@@ -94,6 +94,36 @@ const invoiceController = {
     }
   },
 
+  undoInvoice: async (req, res) => {
+    try {
+      const { id, reason } = req.body;
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'Invoice ID is required in the body.' });
+      }
+
+      const result = await Invoice.undoInvoice(id, req.user?.id || null, reason || null);
+
+      if (!result.success) {
+        return res.status(404).json({ success: false, message: 'Invoice not found' });
+      }
+
+      await logUserActivity(req, {
+        model_name: 'invoices',
+        action_type: 'DELETE',
+        record_id: id,
+        description: `Undo invoice ${result.invoice_number || id}${reason ? `: ${reason}` : ''}`
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Invoice undo completed successfully.',
+        data: result
+      });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
   getInvoiceSummary: async (req, res) => {
     try {
       const { page = 1, limit = 10, search = '' } = req.body;
