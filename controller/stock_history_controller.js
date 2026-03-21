@@ -27,13 +27,18 @@ const stockHistoryController = {
 
       const { rows: history, total } = await StockHistory.findByItemCode(item_code, filters);
       const summary = await StockHistory.getSummaryByItemCode(item_code, filters);
+      const currentStock = await StockHistory.getCurrentStockByItemCode(item_code);
 
       res.status(200).json({
         success: true,
         data: {
           item_code,
           history,
-          summary
+          summary: {
+            ...(summary || {}),
+            current_stock_pcs: currentStock.current_stock_pcs,
+            current_stock_kg: currentStock.current_stock_kg
+          }
         },
         pagination: {
           page,
@@ -96,10 +101,15 @@ const stockHistoryController = {
 
       const filters = { start_date, end_date };
       const summary = await StockHistory.getSummaryByItemCode(item_code, filters);
+      const currentStock = await StockHistory.getCurrentStockByItemCode(item_code);
 
       res.status(200).json({
         success: true,
-        data: summary
+        data: {
+          ...(summary || {}),
+          current_stock_pcs: currentStock.current_stock_pcs,
+          current_stock_kg: currentStock.current_stock_kg
+        }
       });
     } catch (error) {
       console.error('Get Item Stock Summary Error:', error);

@@ -156,6 +156,25 @@ const StockHistory = {
 
     const [rows] = await db.query(query, values);
     return rows[0] || null;
+  },
+
+  getCurrentStockByItemCode: async (itemCode) => {
+    const [rows] = await db.query(
+      'SELECT stock_quantity, stock_kg FROM master_items WHERE item_code = ? LIMIT 1',
+      [itemCode]
+    );
+
+    if (!rows || rows.length === 0) {
+      return {
+        current_stock_pcs: 0,
+        current_stock_kg: 0
+      };
+    }
+
+    return {
+      current_stock_pcs: parseFloat(rows[0].stock_quantity || 0),
+      current_stock_kg: parseFloat(rows[0].stock_kg || 0)
+    };
   }
 };
 
