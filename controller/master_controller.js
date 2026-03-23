@@ -106,8 +106,8 @@ const masterController = {
   },
   getItemCodes: async (req, res) => {
     try {
-      const itemCodes = await MasterItem.findAllItemCodes();
-      res.status(200).json({ success: true, data: itemCodes });
+      const items = await MasterItem.findAllItemCodes();
+      res.status(200).json({ success: true, data: items });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
@@ -238,13 +238,15 @@ const masterController = {
       }
 
       const [contactRows] = await db.query(
-        'SELECT id FROM contacts WHERE code = ? AND type = "Customer" LIMIT 1',
+        'SELECT id, type FROM contacts WHERE code = ? AND type IN ("Customer", "Supplier") LIMIT 1',
         [normalizedCustomerCode]
       );
 
       if (contactRows.length === 0) {
-        return res.status(404).json({ success: false, message: 'Customer not found for provided customer_code.' });
+        return res.status(404).json({ success: false, message: 'Contact not found for provided customer_code. Allowed types: Customer, Supplier.' });
       }
+
+      const contactType = contactRows[0].type;
 
       const created = [];
       const skipped = [];
@@ -260,7 +262,7 @@ const masterController = {
           );
 
           if (existingRows.length > 0) {
-            skipped.push({ item_code: itemCode, reason: 'Already exists for this customer' });
+            skipped.push({ item_code: itemCode, reason: 'Already exists for this contact code' });
             continue;
           }
 
@@ -294,12 +296,13 @@ const masterController = {
       await logUserActivity(req, {
         model_name: 'inventory_items',
         action_type: 'CREATE',
-        description: `Created inventory from master for ${normalizedCustomerCode} (created: ${created.length}, skipped: ${skipped.length}, failed: ${failed.length})`
+        description: `Created inventory from master for ${normalizedCustomerCode} [${contactType}] (created: ${created.length}, skipped: ${skipped.length}, failed: ${failed.length})`
       });
 
       res.status(200).json({
         success: true,
         customer_code: normalizedCustomerCode,
+        contact_type: contactType,
         createdCount: created.length,
         skippedCount: skipped.length,
         failedCount: failed.length,

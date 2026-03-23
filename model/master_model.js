@@ -37,8 +37,8 @@ const MasterItem = {
     return result.affectedRows;
   },
   findAllItemCodes: async () => {
-    const [rows] = await db.query('SELECT item_code FROM master_items');
-    return rows.map(row => row.item_code);
+    const [rows] = await db.query('SELECT item_code, description FROM master_items ORDER BY item_code');
+    return rows;
   },
 
   // Paginated search with multi-term support
