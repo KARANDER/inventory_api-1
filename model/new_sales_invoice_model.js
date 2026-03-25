@@ -141,10 +141,10 @@ const Invoice = {
         if (item_code && item_finish && total_pcs_to_invoice > 0) {
           const [salesOrders] = await connection.query(`
               SELECT id, quantity_pcs FROM sales_orders
-              WHERE item_code = ? AND finish = ? AND quantity_pcs > 0
+              WHERE item_code = ? AND finish = ? AND (customer_code = ? OR customer_id = ?) AND quantity_pcs > 0
               ORDER BY id ASC
               FOR UPDATE
-          `, [item_code, item_finish]);
+          `, [item_code, item_finish, invoiceData.customer_id, invoiceData.customer_id]);
           if (salesOrders && salesOrders.length > 0) {
             for (const order of salesOrders) {
               if (total_pcs_to_invoice <= 0) {
@@ -271,29 +271,219 @@ const Invoice = {
     try {
       await connection.beginTransaction();
 
-      // Step 1: Update the main invoice details (e.g., invoice_date)
+      const toNum = (v) => {
+        const n = parseFloat(v);
+        return Number.isFinite(n) ? n : 0;
+      };
+
+      const buildAgg = (lineItems) => {
+        const stock = {};
+        const orders = {};
+
+        for (const line of lineItems) {
+          const itemCode = line.item_code;
+          if (!itemCode) continue;
+
+          const pcs = toNum(line.total_pcs);
+          const kg = toNum(line.net_kg);
+          const itemFinish = line.item_finish || '';
+
+          if (!stock[itemCode]) {
+            stock[itemCode] = { pcs: 0, kg: 0 };
+          }
+          stock[itemCode].pcs += pcs;
+          stock[itemCode].kg += kg;
+
+          if (itemFinish && pcs !== 0) {
+            const key = `${itemCode}|||${itemFinish}`;
+            orders[key] = (orders[key] || 0) + pcs;
+          }
+        }
+
+        return { stock, orders };
+      };
+
+      const [invoiceRows] = await connection.query(
+        'SELECT id, invoice_number, invoice_date, customer_id FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
+        [id]
+      );
+      if (invoiceRows.length === 0) {
+        await connection.rollback();
+        return { success: false, message: 'Invoice not found' };
+      }
+      const invoice = invoiceRows[0];
+
+      const [existingItems] = await connection.query(
+        'SELECT * FROM invoice_items WHERE invoice_id = ? FOR UPDATE',
+        [id]
+      );
+
+      const existingById = new Map(existingItems.map((row) => [String(row.id), row]));
+      const deletedIds = new Set((deleted_item_ids || []).map((x) => String(x)));
+
+      for (const delId of deletedIds) {
+        existingById.delete(delId);
+      }
+
+      let newCounter = 1;
+      for (const item of items) {
+        if (item.id) {
+          const key = String(item.id);
+          if (!existingById.has(key)) {
+            throw new Error(`Invoice item with id ${item.id} not found for this invoice.`);
+          }
+          const oldRow = existingById.get(key);
+          existingById.set(key, { ...oldRow, ...item });
+        } else {
+          existingById.set(`new-${newCounter++}`, { ...item });
+        }
+      }
+
+      const finalItems = Array.from(existingById.values());
+
+      const oldAgg = buildAgg(existingItems);
+      const newAgg = buildAgg(finalItems);
+
+      // 1) Adjust sales_orders by delta (new - old)
+      const orderKeys = new Set([...Object.keys(oldAgg.orders), ...Object.keys(newAgg.orders)]);
+      for (const key of orderKeys) {
+        const oldPcs = oldAgg.orders[key] || 0;
+        const newPcs = newAgg.orders[key] || 0;
+        const deltaPcs = newPcs - oldPcs;
+        if (deltaPcs === 0) continue;
+
+        const [itemCode, itemFinish] = key.split('|||');
+
+        if (deltaPcs > 0) {
+          let remaining = deltaPcs;
+          const [salesOrders] = await connection.query(
+            `SELECT id, quantity_pcs
+             FROM sales_orders
+             WHERE item_code = ? AND finish = ? AND (customer_code = ? OR customer_id = ?) AND quantity_pcs > 0
+             ORDER BY id ASC
+             FOR UPDATE`,
+            [itemCode, itemFinish, invoice.customer_id, invoice.customer_id]
+          );
+
+          for (const order of salesOrders) {
+            if (remaining <= 0) break;
+            const available = toNum(order.quantity_pcs);
+            const deduct = Math.min(remaining, available);
+            if (deduct <= 0) continue;
+
+            await connection.query(
+              'UPDATE sales_orders SET quantity_pcs = quantity_pcs - ? WHERE id = ?',
+              [deduct, order.id]
+            );
+            remaining -= deduct;
+          }
+
+          if (remaining > 0) {
+            throw new Error(`Insufficient quantity in sales orders for item ${itemCode}. Short by ${remaining} pcs.`);
+          }
+        } else {
+          let remainingRestore = Math.abs(deltaPcs);
+          const [salesOrders] = await connection.query(
+            `SELECT id, quantity_pcs, initial_qty
+             FROM sales_orders
+             WHERE item_code = ? AND finish = ? AND (customer_code = ? OR customer_id = ?)
+             ORDER BY id ASC
+             FOR UPDATE`,
+            [itemCode, itemFinish, invoice.customer_id, invoice.customer_id]
+          );
+
+          if (salesOrders.length === 0) {
+            throw new Error(`Cannot restore quantity for item ${itemCode}: no matching sales orders found.`);
+          }
+
+          for (const order of salesOrders) {
+            if (remainingRestore <= 0) break;
+
+            const currentQty = toNum(order.quantity_pcs);
+            const maxQty = order.initial_qty == null ? currentQty + remainingRestore : toNum(order.initial_qty);
+            const canRestore = Math.max(maxQty - currentQty, 0);
+            if (canRestore <= 0) continue;
+
+            const addQty = Math.min(remainingRestore, canRestore);
+            await connection.query(
+              'UPDATE sales_orders SET quantity_pcs = quantity_pcs + ? WHERE id = ?',
+              [addQty, order.id]
+            );
+            remainingRestore -= addQty;
+          }
+
+          if (remainingRestore > 0) {
+            throw new Error(`Unable to fully restore sales order quantity for item ${itemCode}. Pending restore: ${remainingRestore} pcs.`);
+          }
+        }
+      }
+
+      // 2) Adjust master stock by delta (new - old)
+      const stockKeys = new Set([...Object.keys(oldAgg.stock), ...Object.keys(newAgg.stock)]);
+      for (const itemCode of stockKeys) {
+        const oldStock = oldAgg.stock[itemCode] || { pcs: 0, kg: 0 };
+        const newStock = newAgg.stock[itemCode] || { pcs: 0, kg: 0 };
+
+        const deltaPcs = newStock.pcs - oldStock.pcs;
+        const deltaKg = newStock.kg - oldStock.kg;
+
+        if (deltaPcs === 0 && deltaKg === 0) continue;
+
+        const [stockUpdateResult] = await connection.query(
+          `UPDATE master_items
+           SET stock_quantity = stock_quantity - ?,
+               stock_kg = COALESCE(stock_kg, 0) - ?
+           WHERE item_code = ?`,
+          [deltaPcs, deltaKg, itemCode]
+        );
+
+        if (stockUpdateResult.affectedRows === 0) {
+          throw new Error(`Master item not found for item_code ${itemCode}`);
+        }
+
+        const qtyPcs = Math.abs(deltaPcs);
+        const qtyKg = Math.abs(deltaKg);
+        const transactionType = (deltaPcs > 0 || (deltaPcs === 0 && deltaKg > 0)) ? 'DEBIT' : 'CREDIT';
+
+        await connection.query(
+          `INSERT INTO stock_history
+          (item_code, transaction_type, invoice_type, invoice_number,
+           quantity_pcs, quantity_kg, movement_date, note, user_id)
+          VALUES (?, ?, 'SALES', ?, ?, ?, ?, ?, ?)`,
+          [
+            itemCode,
+            transactionType,
+            mainInvoiceData.invoice_number || invoice.invoice_number || null,
+            qtyPcs,
+            qtyKg,
+            mainInvoiceData.invoice_date || invoice.invoice_date || new Date(),
+            'Invoice update stock adjustment',
+            mainInvoiceData.updated_by || null
+          ]
+        );
+      }
+
+      // Step 3: Update the main invoice details
       if (Object.keys(mainInvoiceData).length > 0) {
         const setClause = Object.keys(mainInvoiceData).map(key => `${key} = ?`).join(', ');
         const values = [...Object.values(mainInvoiceData), id];
         await connection.query(`UPDATE invoices SET ${setClause} WHERE id = ?`, values);
       }
 
-      // Step 2: Delete any line items the user removed
+      // Step 4: Delete any line items the user removed
       if (deleted_item_ids && deleted_item_ids.length > 0) {
         const deleteQuery = 'DELETE FROM invoice_items WHERE id IN (?) AND invoice_id = ?';
         await connection.query(deleteQuery, [deleted_item_ids, id]);
       }
 
-      // Step 3: Update existing items or insert new ones
+      // Step 5: Update existing items or insert new ones
       for (const item of items) {
         if (item.id) {
-          // Update existing item
           const { id: itemId, ...itemData } = item;
           await connection.query('UPDATE invoice_items SET ? WHERE id = ? AND invoice_id = ?', [itemData, itemId, id]);
         } else {
-          // Insert new item
-          item.invoice_id = id;
-          await connection.query('INSERT INTO invoice_items SET ?', item);
+          const itemData = { ...item, invoice_id: id };
+          await connection.query('INSERT INTO invoice_items SET ?', itemData);
         }
       }
 
@@ -395,10 +585,10 @@ const Invoice = {
           const [salesOrders] = await connection.query(
             `SELECT id, quantity_pcs, initial_qty
              FROM sales_orders
-             WHERE item_code = ? AND finish = ?
+             WHERE item_code = ? AND finish = ? AND (customer_code = ? OR customer_id = ?)
              ORDER BY id ASC
              FOR UPDATE`,
-            [itemCode, itemFinish]
+            [itemCode, itemFinish, invoice.customer_id, invoice.customer_id]
           );
 
           for (const order of salesOrders) {
