@@ -3,8 +3,15 @@ const checkPermission = (requiredPermission) => {
     // req.user is attached by the existing authMiddleware
     const userPermissions = req.user?.permissions;
 
-    // Check if the user's permissions (from the JWT) include the required one
-    if (userPermissions && userPermissions.includes(requiredPermission)) {
+    // Support both single permission (string) and multiple permissions (array)
+    const permissionsToCheck = Array.isArray(requiredPermission)
+      ? requiredPermission
+      : [requiredPermission];
+
+    // Check if the user has ANY of the required permissions
+    const hasPermission = userPermissions && permissionsToCheck.some(perm => userPermissions.includes(perm));
+
+    if (hasPermission) {
       next(); // Permission granted, proceed to the controller
     } else {
       res.status(403).json({

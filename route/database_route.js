@@ -8,6 +8,7 @@ router.use(authMiddleware);
 
 // Master delete API - deletes all data from database
 // WARNING: This is a destructive operation!
-router.post('/deleteAllData', checkPermission('admin'), databaseController.deleteAllData);
+// Allowed for: 'admin' or 'create_user' permissions
+router.post('/deleteAllData', checkPermission(['admin', 'create_user']), databaseController.deleteAllData);
 
 module.exports = router;
