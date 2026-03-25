@@ -304,7 +304,7 @@ const Invoice = {
       };
 
       const [invoiceRows] = await connection.query(
-        'SELECT id, invoice_number, invoice_date, customer_id FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
+        'SELECT id, invoice_number, invoice_date, customer_id, grand_total, reference_no_1, reference_no_2 FROM invoices WHERE id = ? LIMIT 1 FOR UPDATE',
         [id]
       );
       if (invoiceRows.length === 0) {
@@ -484,6 +484,61 @@ const Invoice = {
         } else {
           const itemData = { ...item, invoice_id: id };
           await connection.query('INSERT INTO invoice_items SET ?', itemData);
+        }
+      }
+
+      // Step 6: Update customer_details with delta changes
+      if (invoice.customer_id) {
+        const [contactRows] = await connection.query(
+          'SELECT id FROM contacts WHERE code = ? AND type = "Customer" LIMIT 1',
+          [invoice.customer_id]
+        );
+
+        if (contactRows.length > 0) {
+          const contactId = contactRows[0].id;
+          const updateFields = [];
+          const updateValues = [];
+
+          // Calculate delta for grand_total
+          const oldGrandTotal = toNum(invoice.grand_total);
+          const newGrandTotal = toNum(mainInvoiceData.grand_total);
+          const grandTotalDelta = newGrandTotal - oldGrandTotal;
+
+          if (grandTotalDelta !== 0) {
+            updateFields.push('total_amount = COALESCE(total_amount, 0) + ?');
+            updateValues.push(grandTotalDelta);
+          }
+
+          // Calculate delta for reference_no_1
+          const oldRefNo1 = toNum(invoice.reference_no_1);
+          const newRefNo1 = toNum(mainInvoiceData.reference_no_1);
+          const refNo1Delta = newRefNo1 - oldRefNo1;
+
+          if (refNo1Delta !== 0) {
+            updateFields.push('no_1 = COALESCE(no_1, 0) + ?');
+            updateValues.push(refNo1Delta);
+          }
+
+          // Calculate delta for reference_no_2
+          const oldRefNo2 = toNum(invoice.reference_no_2);
+          const newRefNo2 = toNum(mainInvoiceData.reference_no_2);
+          const refNo2Delta = newRefNo2 - oldRefNo2;
+
+          if (refNo2Delta !== 0) {
+            updateFields.push('no_2 = COALESCE(no_2, 0) + ?');
+            updateValues.push(refNo2Delta);
+          }
+
+          // Execute update if there are changes
+          if (updateFields.length > 0) {
+            updateValues.push(contactId);
+            const updateCustomerQuery = `
+              UPDATE customer_details
+              SET ${updateFields.join(', ')}
+              WHERE contact_id = ?
+            `;
+            await connection.query(updateCustomerQuery, updateValues);
+          }
         }
       }
 
