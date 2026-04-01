@@ -3,14 +3,74 @@ const db = require('../config/db');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
 
+const toNum = (value) => {
+  const n = parseFloat(value);
+  return Number.isFinite(n) ? n : 0;
+};
+
+const buildAdjustmentDisplay = (rawAdjustment) => {
+  if (rawAdjustment === null || rawAdjustment === undefined) return null;
+  const text = String(rawAdjustment).trim();
+  if (!text) return null;
+  if (text.endsWith('%')) return text;
+  const fixed = parseFloat(text);
+  if (Number.isFinite(fixed)) return `Rs ${fixed}`;
+  return text;
+};
+
+const applyRateAdjustment = ({ baseRate, rawAdjustment }) => {
+  const normalizedBase = toNum(baseRate);
+
+  if (rawAdjustment === null || rawAdjustment === undefined || String(rawAdjustment).trim() === '') {
+    return {
+      adjustedRatePcs: normalizedBase,
+      normalizedAdjustment: null
+    };
+  }
+
+  const text = String(rawAdjustment).trim();
+  let adjustmentAmount = 0;
+
+  if (text.endsWith('%')) {
+    const percent = parseFloat(text.slice(0, -1).trim());
+    if (!Number.isFinite(percent)) {
+      throw new Error('Invalid rate_adjustment. Use format like 2 or 2%.');
+    }
+    adjustmentAmount = (normalizedBase * percent) / 100;
+  } else {
+    const fixedAmount = parseFloat(text);
+    if (!Number.isFinite(fixedAmount)) {
+      throw new Error('Invalid rate_adjustment. Use format like 2 or 2%.');
+    }
+    adjustmentAmount = fixedAmount;
+  }
+
+  const finalRate = normalizedBase + adjustmentAmount;
+  return {
+    adjustedRatePcs: Number(finalRate.toFixed(4)),
+    normalizedAdjustment: text
+  };
+};
+
+const formatItemForResponse = (item) => ({
+  ...item,
+  rate_adjustment_display: buildAdjustmentDisplay(item.rate_adjustment)
+});
+
 const inventoryController = {
   createItem: async (req, res) => {
     try {
       const createdBy = req.user.id;
-      const { item_code, user, stock_quantity, ...otherData } = req.body;
+      const { item_code, user, stock_quantity, rate_adjustment, ...otherData } = req.body;
 
       // Combine item_code and user for a unique reference if needed
       const code_user = item_code + (user || '');
+
+      const baseRatePcs = toNum(otherData.rate_pcs);
+      const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+        baseRate: baseRatePcs,
+        rawAdjustment: rate_adjustment
+      });
 
       // Prepare the data for the new inventory item
       const newItemData = {
@@ -18,6 +78,8 @@ const inventoryController = {
         stock_quantity,
         user,
         ...otherData,
+        rate_adjustment: normalizedAdjustment,
+        rate_pcs: adjustedRatePcs,
         code_user,
         created_by: createdBy,
       };
@@ -50,7 +112,7 @@ const inventoryController = {
         record_id: newItem.id,
         description: 'Created inventory item'
       });
-      res.status(201).json({ success: true, data: newItem });
+      res.status(201).json({ success: true, data: formatItemForResponse(newItem) });
 
     } catch (error) {
       // Log any errors that occur and send a server error response
@@ -70,9 +132,11 @@ const inventoryController = {
         search: search || ''
       });
 
+      const formattedData = result.data.map(formatItemForResponse);
+
       res.status(200).json({
         success: true,
-        data: result.data,
+        data: formattedData,
         pagination: result.pagination
       });
     } catch (error) {
@@ -92,6 +156,16 @@ const inventoryController = {
       const oldRecord = await InventoryItem.findById(id);
       if (!oldRecord) {
         return res.status(404).json({ success: false, message: 'Item not found' });
+      }
+
+      if (Object.prototype.hasOwnProperty.call(req.body, 'rate_adjustment')) {
+        const baseRateForUpdate = toNum(oldRecord.rate_pcs);
+        const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+          baseRate: baseRateForUpdate,
+          rawAdjustment: req.body.rate_adjustment
+        });
+        itemData.rate_adjustment = normalizedAdjustment;
+        itemData.rate_pcs = adjustedRatePcs;
       }
 
       const affectedRows = await InventoryItem.update(id, itemData);
@@ -152,6 +226,15 @@ const inventoryController = {
         // No id = new record, create it
         if (!id) {
           try {
+            if (Object.prototype.hasOwnProperty.call(itemData, 'rate_adjustment')) {
+              const baseRateForCreate = toNum(fieldsToUpdate.rate_pcs);
+              const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+                baseRate: baseRateForCreate,
+                rawAdjustment: itemData.rate_adjustment
+              });
+              fieldsToUpdate.rate_adjustment = normalizedAdjustment;
+              fieldsToUpdate.rate_pcs = adjustedRatePcs;
+            }
             const newItem = await InventoryItem.create(fieldsToUpdate);
             created.push({ id: newItem.id });
           } catch (error) {
@@ -161,6 +244,23 @@ const inventoryController = {
         }
 
         try {
+          if (Object.prototype.hasOwnProperty.call(itemData, 'rate_adjustment')) {
+            const oldRecord = await InventoryItem.findById(id);
+            if (!oldRecord) {
+              failed.push({ id, message: 'Item not found' });
+              continue;
+            }
+
+            const baseRateForUpdate = toNum(oldRecord.rate_pcs);
+            const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+              baseRate: baseRateForUpdate,
+              rawAdjustment: itemData.rate_adjustment
+            });
+
+            fieldsToUpdate.rate_adjustment = normalizedAdjustment;
+            fieldsToUpdate.rate_pcs = adjustedRatePcs;
+          }
+
           const affected = await InventoryItem.update(id, fieldsToUpdate);
           if (affected === 0) {
             failed.push({ id, message: 'Item not found' });
@@ -206,7 +306,7 @@ const inventoryController = {
       }
       // Partial search using LIKE
       const items = await InventoryItem.searchByItemCode(item_code);
-      res.status(200).json({ success: true, data: items });
+      res.status(200).json({ success: true, data: items.map(formatItemForResponse) });
     } catch (error) {
       res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
