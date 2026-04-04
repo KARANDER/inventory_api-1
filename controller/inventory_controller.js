@@ -23,7 +23,7 @@ const applyRateAdjustment = ({ baseRate, rawAdjustment }) => {
 
   if (rawAdjustment === null || rawAdjustment === undefined || String(rawAdjustment).trim() === '') {
     return {
-      adjustedRatePcs: normalizedBase,
+      calculatedRatePcs: normalizedBase,
       normalizedAdjustment: null
     };
   }
@@ -47,7 +47,7 @@ const applyRateAdjustment = ({ baseRate, rawAdjustment }) => {
 
   const finalRate = normalizedBase + adjustmentAmount;
   return {
-    adjustedRatePcs: Number(finalRate.toFixed(4)),
+    calculatedRatePcs: Number(finalRate.toFixed(4)),
     normalizedAdjustment: text
   };
 };
@@ -66,8 +66,9 @@ const inventoryController = {
       // Combine item_code and user for a unique reference if needed
       const code_user = item_code + (user || '');
 
+      // Store the initial rate_pcs as base_rate_pcs (never changes)
       const baseRatePcs = toNum(otherData.rate_pcs);
-      const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+      const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
         baseRate: baseRatePcs,
         rawAdjustment: rate_adjustment
       });
@@ -79,7 +80,8 @@ const inventoryController = {
         user,
         ...otherData,
         rate_adjustment: normalizedAdjustment,
-        rate_pcs: adjustedRatePcs,
+        base_rate_pcs: baseRatePcs,
+        rate_pcs: calculatedRatePcs,
         code_user,
         created_by: createdBy,
       };
@@ -159,13 +161,16 @@ const inventoryController = {
       }
 
       if (Object.prototype.hasOwnProperty.call(req.body, 'rate_adjustment')) {
-        const baseRateForUpdate = toNum(oldRecord.rate_pcs);
-        const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+        const baseRateForUpdate = toNum(oldRecord.base_rate_pcs ?? oldRecord.rate_pcs);
+        const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
           baseRate: baseRateForUpdate,
           rawAdjustment: req.body.rate_adjustment
         });
+        if (oldRecord.base_rate_pcs == null) {
+          itemData.base_rate_pcs = baseRateForUpdate;
+        }
         itemData.rate_adjustment = normalizedAdjustment;
-        itemData.rate_pcs = adjustedRatePcs;
+        itemData.rate_pcs = calculatedRatePcs;
       }
 
       const affectedRows = await InventoryItem.update(id, itemData);
@@ -226,14 +231,19 @@ const inventoryController = {
         // No id = new record, create it
         if (!id) {
           try {
+            if (fieldsToUpdate.base_rate_pcs == null) {
+              fieldsToUpdate.base_rate_pcs = toNum(fieldsToUpdate.rate_pcs);
+            }
+
             if (Object.prototype.hasOwnProperty.call(itemData, 'rate_adjustment')) {
-              const baseRateForCreate = toNum(fieldsToUpdate.rate_pcs);
-              const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+              const baseRateForCreate = toNum(fieldsToUpdate.base_rate_pcs);
+              const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
                 baseRate: baseRateForCreate,
                 rawAdjustment: itemData.rate_adjustment
               });
+              fieldsToUpdate.base_rate_pcs = baseRateForCreate;
               fieldsToUpdate.rate_adjustment = normalizedAdjustment;
-              fieldsToUpdate.rate_pcs = adjustedRatePcs;
+              fieldsToUpdate.rate_pcs = calculatedRatePcs;
             }
             const newItem = await InventoryItem.create(fieldsToUpdate);
             created.push({ id: newItem.id });
@@ -251,14 +261,17 @@ const inventoryController = {
               continue;
             }
 
-            const baseRateForUpdate = toNum(oldRecord.rate_pcs);
-            const { adjustedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+            const baseRateForUpdate = toNum(oldRecord.base_rate_pcs ?? oldRecord.rate_pcs);
+            const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
               baseRate: baseRateForUpdate,
               rawAdjustment: itemData.rate_adjustment
             });
 
+            if (oldRecord.base_rate_pcs == null) {
+              fieldsToUpdate.base_rate_pcs = baseRateForUpdate;
+            }
             fieldsToUpdate.rate_adjustment = normalizedAdjustment;
-            fieldsToUpdate.rate_pcs = adjustedRatePcs;
+            fieldsToUpdate.rate_pcs = calculatedRatePcs;
           }
 
           const affected = await InventoryItem.update(id, fieldsToUpdate);
