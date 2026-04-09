@@ -67,6 +67,44 @@ const resolveBaseRateForAdjustment = (oldRecord) => {
   return { baseRate: storedBase, shouldPersistBase: false };
 };
 
+const applyRateFieldsForExistingItemUpdate = (payload, oldRecord) => {
+  const hasAdjustmentInput = Object.prototype.hasOwnProperty.call(payload, 'rate_adjustment');
+  const hasBaseInput = Object.prototype.hasOwnProperty.call(payload, 'base_rate_pcs');
+
+  const {
+    baseRate: resolvedBaseRate,
+    shouldPersistBase
+  } = resolveBaseRateForAdjustment(oldRecord);
+
+  const incomingBaseRate = hasBaseInput ? toNum(payload.base_rate_pcs) : null;
+
+  // Case 1: User entered adjustment (optionally with a new base).
+  if (hasAdjustmentInput) {
+    const baseForCalculation = hasBaseInput ? incomingBaseRate : resolvedBaseRate;
+    const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
+      baseRate: baseForCalculation,
+      rawAdjustment: payload.rate_adjustment
+    });
+
+    payload.base_rate_pcs = baseForCalculation;
+    payload.rate_adjustment = normalizedAdjustment;
+    payload.rate_pcs = calculatedRatePcs;
+    return;
+  }
+
+  // Case 2: User changed only base rate.
+  if (hasBaseInput) {
+    // Only sync rate fields when base actually changed, so full-row updates don't reset values accidentally.
+    if (incomingBaseRate !== resolvedBaseRate || shouldPersistBase) {
+      payload.base_rate_pcs = incomingBaseRate;
+      payload.rate_adjustment = null;
+      payload.rate_pcs = incomingBaseRate;
+    } else {
+      delete payload.base_rate_pcs;
+    }
+  }
+};
+
 const formatItemForResponse = (item) => ({
   ...item,
   rate_adjustment_display: buildAdjustmentDisplay(item.rate_adjustment)
@@ -81,8 +119,9 @@ const inventoryController = {
       // Combine item_code and user for a unique reference if needed
       const code_user = item_code + (user || '');
 
-      // Store the initial rate_pcs as base_rate_pcs (never changes)
-      const baseRatePcs = toNum(otherData.rate_pcs);
+      // Store the initial base rate (never changes unless explicitly edited later)
+      const hasBaseRateInput = Object.prototype.hasOwnProperty.call(req.body, 'base_rate_pcs');
+      const baseRatePcs = hasBaseRateInput ? toNum(req.body.base_rate_pcs) : toNum(otherData.rate_pcs);
       const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
         baseRate: baseRatePcs,
         rawAdjustment: rate_adjustment
@@ -175,18 +214,7 @@ const inventoryController = {
         return res.status(404).json({ success: false, message: 'Item not found' });
       }
 
-      if (Object.prototype.hasOwnProperty.call(req.body, 'rate_adjustment')) {
-        const { baseRate: baseRateForUpdate, shouldPersistBase } = resolveBaseRateForAdjustment(oldRecord);
-        const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
-          baseRate: baseRateForUpdate,
-          rawAdjustment: req.body.rate_adjustment
-        });
-        if (shouldPersistBase) {
-          itemData.base_rate_pcs = baseRateForUpdate;
-        }
-        itemData.rate_adjustment = normalizedAdjustment;
-        itemData.rate_pcs = calculatedRatePcs;
-      }
+      applyRateFieldsForExistingItemUpdate(itemData, oldRecord);
 
       const affectedRows = await InventoryItem.update(id, itemData);
       if (affectedRows === 0) {
@@ -246,12 +274,11 @@ const inventoryController = {
         // No id = new record, create it
         if (!id) {
           try {
-            if (fieldsToUpdate.base_rate_pcs == null) {
-              fieldsToUpdate.base_rate_pcs = toNum(fieldsToUpdate.rate_pcs);
-            }
+            const hasBaseRateInput = Object.prototype.hasOwnProperty.call(itemData, 'base_rate_pcs');
+            const baseRateForCreate = hasBaseRateInput ? toNum(itemData.base_rate_pcs) : toNum(fieldsToUpdate.rate_pcs);
+            fieldsToUpdate.base_rate_pcs = baseRateForCreate;
 
             if (Object.prototype.hasOwnProperty.call(itemData, 'rate_adjustment')) {
-              const baseRateForCreate = toNum(fieldsToUpdate.base_rate_pcs);
               const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
                 baseRate: baseRateForCreate,
                 rawAdjustment: itemData.rate_adjustment
@@ -259,6 +286,8 @@ const inventoryController = {
               fieldsToUpdate.base_rate_pcs = baseRateForCreate;
               fieldsToUpdate.rate_adjustment = normalizedAdjustment;
               fieldsToUpdate.rate_pcs = calculatedRatePcs;
+            } else {
+              fieldsToUpdate.rate_pcs = baseRateForCreate;
             }
             const newItem = await InventoryItem.create(fieldsToUpdate);
             created.push({ id: newItem.id });
@@ -269,24 +298,16 @@ const inventoryController = {
         }
 
         try {
-          if (Object.prototype.hasOwnProperty.call(itemData, 'rate_adjustment')) {
+          if (
+            Object.prototype.hasOwnProperty.call(itemData, 'rate_adjustment') ||
+            Object.prototype.hasOwnProperty.call(itemData, 'base_rate_pcs')
+          ) {
             const oldRecord = await InventoryItem.findById(id);
             if (!oldRecord) {
               failed.push({ id, message: 'Item not found' });
               continue;
             }
-
-            const { baseRate: baseRateForUpdate, shouldPersistBase } = resolveBaseRateForAdjustment(oldRecord);
-            const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
-              baseRate: baseRateForUpdate,
-              rawAdjustment: itemData.rate_adjustment
-            });
-
-            if (shouldPersistBase) {
-              fieldsToUpdate.base_rate_pcs = baseRateForUpdate;
-            }
-            fieldsToUpdate.rate_adjustment = normalizedAdjustment;
-            fieldsToUpdate.rate_pcs = calculatedRatePcs;
+            applyRateFieldsForExistingItemUpdate(fieldsToUpdate, oldRecord);
           }
 
           const affected = await InventoryItem.update(id, fieldsToUpdate);
