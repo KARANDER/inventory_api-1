@@ -52,6 +52,21 @@ const applyRateAdjustment = ({ baseRate, rawAdjustment }) => {
   };
 };
 
+const resolveBaseRateForAdjustment = (oldRecord) => {
+  const hasStoredBase = oldRecord.base_rate_pcs !== null && oldRecord.base_rate_pcs !== undefined;
+  const storedBase = toNum(oldRecord.base_rate_pcs);
+  const currentRate = toNum(oldRecord.rate_pcs);
+
+  // Legacy recovery: some migrated rows have base_rate_pcs = 0 while current rate is non-zero.
+  const looksLegacyBroken = hasStoredBase && storedBase === 0 && currentRate !== 0;
+
+  if (!hasStoredBase || looksLegacyBroken) {
+    return { baseRate: currentRate, shouldPersistBase: true };
+  }
+
+  return { baseRate: storedBase, shouldPersistBase: false };
+};
+
 const formatItemForResponse = (item) => ({
   ...item,
   rate_adjustment_display: buildAdjustmentDisplay(item.rate_adjustment)
@@ -161,12 +176,12 @@ const inventoryController = {
       }
 
       if (Object.prototype.hasOwnProperty.call(req.body, 'rate_adjustment')) {
-        const baseRateForUpdate = toNum(oldRecord.base_rate_pcs ?? oldRecord.rate_pcs);
+        const { baseRate: baseRateForUpdate, shouldPersistBase } = resolveBaseRateForAdjustment(oldRecord);
         const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
           baseRate: baseRateForUpdate,
           rawAdjustment: req.body.rate_adjustment
         });
-        if (oldRecord.base_rate_pcs == null) {
+        if (shouldPersistBase) {
           itemData.base_rate_pcs = baseRateForUpdate;
         }
         itemData.rate_adjustment = normalizedAdjustment;
@@ -261,13 +276,13 @@ const inventoryController = {
               continue;
             }
 
-            const baseRateForUpdate = toNum(oldRecord.base_rate_pcs ?? oldRecord.rate_pcs);
+            const { baseRate: baseRateForUpdate, shouldPersistBase } = resolveBaseRateForAdjustment(oldRecord);
             const { calculatedRatePcs, normalizedAdjustment } = applyRateAdjustment({
               baseRate: baseRateForUpdate,
               rawAdjustment: itemData.rate_adjustment
             });
 
-            if (oldRecord.base_rate_pcs == null) {
+            if (shouldPersistBase) {
               fieldsToUpdate.base_rate_pcs = baseRateForUpdate;
             }
             fieldsToUpdate.rate_adjustment = normalizedAdjustment;
