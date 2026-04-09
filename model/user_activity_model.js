@@ -67,6 +67,32 @@ const UserActivity = {
 
     const [rows] = await db.query(query, values);
     return rows;
+  },
+
+  batchDeleteByIds: async (ids = []) => {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return { deletedCount: 0, notFoundIds: [] };
+    }
+
+    const [existingRows] = await db.query(
+      'SELECT id FROM user_activity WHERE id IN (?)',
+      [ids]
+    );
+
+    const existingIds = existingRows.map(row => row.id);
+    const existingSet = new Set(existingIds);
+    const notFoundIds = ids.filter(id => !existingSet.has(id));
+
+    let deletedCount = 0;
+    if (existingIds.length > 0) {
+      const [deleteResult] = await db.query(
+        'DELETE FROM user_activity WHERE id IN (?)',
+        [existingIds]
+      );
+      deletedCount = deleteResult.affectedRows || 0;
+    }
+
+    return { deletedCount, notFoundIds };
   }
 };
 

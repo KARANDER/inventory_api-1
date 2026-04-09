@@ -10,6 +10,7 @@ router.use(authMiddleware);
 const permission = 'accounts';
 
 router.post('/getHistory', checkPermission(permission), userActivityController.getHistory);
+router.post('/batchDeleteHistory', checkPermission(permission), userActivityController.batchDeleteHistory);
 
 module.exports = router;
 
