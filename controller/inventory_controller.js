@@ -67,6 +67,39 @@ const resolveBaseRateForAdjustment = (oldRecord) => {
   return { baseRate: storedBase, shouldPersistBase: false };
 };
 
+const normalizeOrderModeFields = (payload) => {
+  if (!Object.prototype.hasOwnProperty.call(payload, 'order_per_pics_kg')) return;
+
+  const raw = payload.order_per_pics_kg;
+  delete payload.order_per_pics_kg;
+
+  if (raw === null || raw === undefined || String(raw).trim() === '') {
+    payload.pic_or_kg = null;
+    return;
+  }
+
+  if (typeof raw === 'number') {
+    payload.pic_or_kg = raw === 1 ? 1 : 0;
+    return;
+  }
+
+  const text = String(raw).trim().toLowerCase();
+  if (['per_kg', 'kg', '1', 'true', 'yes'].includes(text)) {
+    payload.pic_or_kg = 1;
+  } else if (['per_pics', 'per_pic', 'per_pcs', 'pics', 'pcs', 'pic', '0', 'false', 'no'].includes(text)) {
+    payload.pic_or_kg = 0;
+  } else {
+    payload.pic_or_kg = null;
+  }
+};
+
+const buildOrderModeDisplay = (picOrKg) => {
+  if (picOrKg === null || picOrKg === undefined) return null;
+  const n = parseInt(picOrKg, 10);
+  if (!Number.isFinite(n)) return null;
+  return n === 1 ? 'per_kg' : 'per_pics';
+};
+
 const applyRateFieldsForExistingItemUpdate = (payload, oldRecord) => {
   const hasAdjustmentInput = Object.prototype.hasOwnProperty.call(payload, 'rate_adjustment');
   const hasBaseInput = Object.prototype.hasOwnProperty.call(payload, 'base_rate_pcs');
@@ -107,7 +140,8 @@ const applyRateFieldsForExistingItemUpdate = (payload, oldRecord) => {
 
 const formatItemForResponse = (item) => ({
   ...item,
-  rate_adjustment_display: buildAdjustmentDisplay(item.rate_adjustment)
+  rate_adjustment_display: buildAdjustmentDisplay(item.rate_adjustment),
+  order_per_pics_kg: buildOrderModeDisplay(item.pic_or_kg)
 });
 
 const inventoryController = {
@@ -139,6 +173,8 @@ const inventoryController = {
         code_user,
         created_by: createdBy,
       };
+
+      normalizeOrderModeFields(newItemData);
 
       // Create the new item in the inventory_items table
       const newItem = await InventoryItem.create(newItemData);
@@ -214,6 +250,8 @@ const inventoryController = {
         return res.status(404).json({ success: false, message: 'Item not found' });
       }
 
+      normalizeOrderModeFields(itemData);
+
       applyRateFieldsForExistingItemUpdate(itemData, oldRecord);
 
       const affectedRows = await InventoryItem.update(id, itemData);
@@ -274,6 +312,8 @@ const inventoryController = {
         // No id = new record, create it
         if (!id) {
           try {
+            normalizeOrderModeFields(fieldsToUpdate);
+
             const hasBaseRateInput = Object.prototype.hasOwnProperty.call(itemData, 'base_rate_pcs');
             const baseRateForCreate = hasBaseRateInput ? toNum(itemData.base_rate_pcs) : toNum(fieldsToUpdate.rate_pcs);
             fieldsToUpdate.base_rate_pcs = baseRateForCreate;
@@ -298,6 +338,8 @@ const inventoryController = {
         }
 
         try {
+          normalizeOrderModeFields(fieldsToUpdate);
+
           if (
             Object.prototype.hasOwnProperty.call(itemData, 'rate_adjustment') ||
             Object.prototype.hasOwnProperty.call(itemData, 'base_rate_pcs')
