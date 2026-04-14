@@ -267,6 +267,29 @@ const salesOrderController = {
     }
   },
 
+  getValidCodeUserListForSalesInvoices: async (req, res) => {
+    try {
+      const codeUserList = await SalesOrder.getValidCodeUserListForSalesInvoices();
+      if (codeUserList.length === 0) {
+        return res.status(404).json({
+          success: false,
+          message: 'No valid code_user found with open sales orders'
+        });
+      }
+      res.status(200).json({
+        success: true,
+        data: codeUserList,
+        count: codeUserList.length
+      });
+    } catch (error) {
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
+      });
+    }
+  },
+
   getValidCodeUserListForSuppliers: async (req, res) => {
     try {
       const codeUserList = await SalesOrder.getValidCodeUserListForSuppliers();

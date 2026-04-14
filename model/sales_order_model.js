@@ -109,6 +109,26 @@ const SalesOrder = {
     return rows;
   },
 
+  getValidCodeUserListForSalesInvoices: async () => {
+    const query = `
+      SELECT DISTINCT i.code_user, i.user, c.contact_name, c.code, i.item_code
+      FROM inventory_items i
+      INNER JOIN contacts c ON i.user = c.code
+      INNER JOIN sales_orders so ON so.item_code = i.item_code
+        AND (
+          so.customer_code = i.user
+          OR so.customer_id = i.user
+        )
+      WHERE c.type = 'Customer'
+        AND i.code_user IS NOT NULL
+        AND i.code_user != ''
+        AND so.quantity_pcs > 0
+      ORDER BY i.code_user ASC
+    `;
+    const [rows] = await db.query(query);
+    return rows;
+  },
+
   getValidCodeUserListForSuppliers: async () => {
     const query = `
       SELECT DISTINCT i.code_user, user,i.item_code

@@ -19,7 +19,8 @@ router.post('/batchDeleteSalesOrder', checkPermission(permission), salesOrderCon
 router.post('/searchSalesOrderByUserName', checkPermission(permission), salesOrderController.searchOrdersByUserName);
 
 router.post('/getValidCodeUserList', checkPermission(permission), salesOrderController.getValidCodeUserList);
-router.post('/getInventoryByCodeUser', checkPermission(permission), salesOrderController.getInventoryByCodeUser); 
+router.post('/getValidCodeUserListForSalesInvoices', checkPermission(permission), salesOrderController.getValidCodeUserListForSalesInvoices);
+router.post('/getInventoryByCodeUser', checkPermission(permission), salesOrderController.getInventoryByCodeUser);
 router.post(
     '/getValidCodeUserListForSuppliers',
     checkPermission(permission),
