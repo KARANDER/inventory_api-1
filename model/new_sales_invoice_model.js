@@ -623,7 +623,7 @@ const Invoice = {
           `INSERT INTO stock_history
           (item_code, transaction_type, invoice_type, invoice_number,
            quantity_pcs, quantity_kg, movement_date, note, user_id)
-          VALUES (?, 'CREDIT', 'UNDO_SALES', ?, ?, ?, ?, ?, ?)`,
+          VALUES (?, 'CREDIT', 'SALES', ?, ?, ?, ?, ?, ?)`,
           [
             itemCode,
             invoice.invoice_number || null,
