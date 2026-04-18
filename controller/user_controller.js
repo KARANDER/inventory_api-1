@@ -4,6 +4,59 @@ const bcrypt = require('bcryptjs');
 const { logUserActivity } = require('../utils/activityLogger');
 
 const userController = {
+  // Get all users
+  getAll: async (req, res) => {
+    try {
+      const users = await User.getAll();
+      res.status(200).json({
+        success: true,
+        data: users
+      });
+    } catch (error) {
+      console.error('Error in getAll users:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error.',
+        error: error.message
+      });
+    }
+  },
+
+  // Get user by ID
+  getById: async (req, res) => {
+    try {
+      const { id } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID is required.'
+        });
+      }
+
+      const user = await User.findById(id);
+
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found.'
+        });
+      }
+
+      res.status(200).json({
+        success: true,
+        data: user
+      });
+    } catch (error) {
+      console.error('Error in getById user:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error.',
+        error: error.message
+      });
+    }
+  },
+
   // --- MODIFIED register function ---
   register: async (req, res) => {
     try {
@@ -47,9 +100,127 @@ const userController = {
 
     } catch (error) {
       console.error('Registration Error:', error);
+
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this email already exists.'
+        });
+      }
+
       res.status(500).json({
         success: false,
         message: 'Server error during registration.',
+        error: error.message
+      });
+    }
+  },
+
+  // Update user
+  update: async (req, res) => {
+    try {
+      const { id, user_name, email, password, permissions } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID is required.'
+        });
+      }
+
+      const existingUser = await User.findById(id);
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found.'
+        });
+      }
+
+      const updateData = {};
+      if (user_name !== undefined) updateData.user_name = user_name;
+      if (email !== undefined) updateData.email = email;
+      if (password !== undefined) updateData.password = password;
+      if (permissions !== undefined) updateData.permissions = permissions;
+
+      const updatedUser = await User.update(id, updateData);
+
+      await logUserActivity(req, {
+        model_name: 'users',
+        action_type: 'UPDATE',
+        record_id: id,
+        description: `Updated user ${updatedUser.user_name}`
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'User updated successfully.',
+        data: updatedUser
+      });
+
+    } catch (error) {
+      console.error('Update Error:', error);
+
+      if (error.code === 'ER_DUP_ENTRY') {
+        return res.status(409).json({
+          success: false,
+          message: 'An account with this email already exists.'
+        });
+      }
+
+      res.status(500).json({
+        success: false,
+        message: 'Server error during update.',
+        error: error.message
+      });
+    }
+  },
+
+  // Delete user
+  delete: async (req, res) => {
+    try {
+      const { id } = req.body;
+
+      if (!id) {
+        return res.status(400).json({
+          success: false,
+          message: 'User ID is required.'
+        });
+      }
+
+      const existingUser = await User.findById(id);
+      if (!existingUser) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found.'
+        });
+      }
+
+      const deleted = await User.delete(id);
+
+      if (!deleted) {
+        return res.status(404).json({
+          success: false,
+          message: 'User not found.'
+        });
+      }
+
+      await logUserActivity(req, {
+        model_name: 'users',
+        action_type: 'DELETE',
+        record_id: id,
+        description: `Deleted user ${existingUser.user_name}`
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'User deleted successfully.'
+      });
+
+    } catch (error) {
+      console.error('Delete Error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server error during deletion.',
         error: error.message
       });
     }

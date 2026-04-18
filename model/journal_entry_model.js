@@ -3,12 +3,12 @@ const db = require('../config/db');
 const JournalEntryModel = {
   // Create new journal entry
   create: async (entryData) => {
-    const { date, type, customer_name, method_id, amount, notes, user_id } = entryData;
+    const { entry_type_id, date, type, customer_name, method_id, amount, notes, user_id } = entryData;
     const query = `
-      INSERT INTO journal_entries (date, type, customer_name, method_id, amount, notes, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO journal_entries (entry_type_id, date, type, customer_name, method_id, amount, notes, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await db.query(query, [date, type, customer_name, method_id, amount, notes || null, user_id]);
+    const [result] = await db.query(query, [entry_type_id, date, type, customer_name, method_id, amount, notes || null, user_id]);
     return await JournalEntryModel.getById(result.insertId);
   },
 
@@ -17,12 +17,20 @@ const JournalEntryModel = {
     let query = `
       SELECT 
         je.*,
-        pm.name as method_name
+        pm.name as method_name,
+        jet.name as entry_type_name
       FROM journal_entries je
       LEFT JOIN payment_methods pm ON je.method_id = pm.id
+      LEFT JOIN journal_entry_types jet ON je.entry_type_id = jet.id
       WHERE 1=1
     `;
     const params = [];
+
+    // Filter by entry type (REQUIRED for user access control)
+    if (filters.entry_type_id) {
+      query += ' AND je.entry_type_id = ?';
+      params.push(filters.entry_type_id);
+    }
 
     if (filters.search) {
       query += ' AND (je.customer_name LIKE ? OR pm.name LIKE ?)';
@@ -61,9 +69,11 @@ const JournalEntryModel = {
     const query = `
       SELECT 
         je.*,
-        pm.name as method_name
+        pm.name as method_name,
+        jet.name as entry_type_name
       FROM journal_entries je
       LEFT JOIN payment_methods pm ON je.method_id = pm.id
+      LEFT JOIN journal_entry_types jet ON je.entry_type_id = jet.id
       WHERE je.id = ?
     `;
     const [rows] = await db.query(query, [id]);
@@ -72,10 +82,14 @@ const JournalEntryModel = {
 
   // Update journal entry
   update: async (id, entryData) => {
-    const { date, type, customer_name, method_id, amount, notes } = entryData;
+    const { entry_type_id, date, type, customer_name, method_id, amount, notes } = entryData;
     const updateKeys = [];
     const updateValues = [];
 
+    if (entry_type_id !== undefined) {
+      updateKeys.push('entry_type_id = ?');
+      updateValues.push(entry_type_id);
+    }
     if (date !== undefined) {
       updateKeys.push('date = ?');
       updateValues.push(date);
@@ -134,6 +148,12 @@ const JournalEntryModel = {
     `;
     const params = [];
 
+    // Filter by entry type (REQUIRED for user access control)
+    if (filters.entry_type_id) {
+      query += ' AND entry_type_id = ?';
+      params.push(filters.entry_type_id);
+    }
+
     if (filters.startDate) {
       query += ' AND date >= ?';
       params.push(filters.startDate);
@@ -146,7 +166,7 @@ const JournalEntryModel = {
 
     const [rows] = await db.query(query, params);
     const metrics = rows[0] || { total_receipts: 0, total_payments: 0 };
-    
+
     const totalReceipts = parseFloat(metrics.total_receipts) || 0;
     const totalPayments = parseFloat(metrics.total_payments) || 0;
     const remainingBalance = totalReceipts - totalPayments;

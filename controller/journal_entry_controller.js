@@ -1,14 +1,25 @@
 const JournalEntryModel = require('../model/journal_entry_model');
+const JournalEntryTypeModel = require('../model/journal_entry_type_model');
 const { logUserActivity } = require('../utils/activityLogger');
 
 const journalEntryController = {
   // Create new journal entry
   create: async (req, res) => {
     try {
-      const { date, type, customer_name, method_id, amount, notes } = req.body;
+      const { entry_type_id, date, type, customer_name, method_id, amount, notes } = req.body;
       const user_id = req.user?.id;
 
       // Validation
+      if (!entry_type_id) {
+        return res.status(400).json({ success: false, message: 'Journal entry type is required' });
+      }
+
+      // Check if user has access to this entry type
+      const hasAccess = await JournalEntryTypeModel.checkUserAccess(user_id, entry_type_id);
+      if (!hasAccess) {
+        return res.status(403).json({ success: false, message: 'You do not have access to this journal entry type' });
+      }
+
       if (!date) {
         return res.status(400).json({ success: false, message: 'Date is required' });
       }
@@ -26,6 +37,7 @@ const journalEntryController = {
       }
 
       const entryData = {
+        entry_type_id: parseInt(entry_type_id),
         date,
         type,
         customer_name: customer_name.trim(),
@@ -54,9 +66,21 @@ const journalEntryController = {
   // Get all journal entries
   getAll: async (req, res) => {
     try {
-      const { search, type, startDate, endDate, limit } = req.body;
+      const { entry_type_id, search, type, startDate, endDate, limit } = req.body;
+      const user_id = req.user?.id;
 
-      const filters = {};
+      // Validation - entry_type_id is required
+      if (!entry_type_id) {
+        return res.status(400).json({ success: false, message: 'Journal entry type ID is required' });
+      }
+
+      // Check if user has access to this entry type
+      const hasAccess = await JournalEntryTypeModel.checkUserAccess(user_id, entry_type_id);
+      if (!hasAccess) {
+        return res.status(403).json({ success: false, message: 'You do not have access to this journal entry type' });
+      }
+
+      const filters = { entry_type_id };
       if (search) filters.search = search;
       if (type) filters.type = type;
       if (startDate) filters.startDate = startDate;
@@ -75,6 +99,7 @@ const journalEntryController = {
   getById: async (req, res) => {
     try {
       const { id } = req.body;
+      const user_id = req.user?.id;
 
       if (!id) {
         return res.status(400).json({ success: false, message: 'Journal entry ID is required' });
@@ -84,6 +109,12 @@ const journalEntryController = {
 
       if (!entry) {
         return res.status(404).json({ success: false, message: 'Journal entry not found' });
+      }
+
+      // Check if user has access to this entry's type
+      const hasAccess = await JournalEntryTypeModel.checkUserAccess(user_id, entry.entry_type_id);
+      if (!hasAccess) {
+        return res.status(403).json({ success: false, message: 'You do not have access to this journal entry' });
       }
 
       res.status(200).json({ success: true, data: entry });
@@ -96,10 +127,31 @@ const journalEntryController = {
   // Update journal entry
   update: async (req, res) => {
     try {
-      const { id, date, type, customer_name, method_id, amount, notes } = req.body;
+      const { id, entry_type_id, date, type, customer_name, method_id, amount, notes } = req.body;
+      const user_id = req.user?.id;
 
       if (!id) {
         return res.status(400).json({ success: false, message: 'Journal entry ID is required' });
+      }
+
+      // Get existing entry to check access
+      const existingEntry = await JournalEntryModel.getById(id);
+      if (!existingEntry) {
+        return res.status(404).json({ success: false, message: 'Journal entry not found' });
+      }
+
+      // Check if user has access to the existing entry's type
+      const hasAccess = await JournalEntryTypeModel.checkUserAccess(user_id, existingEntry.entry_type_id);
+      if (!hasAccess) {
+        return res.status(403).json({ success: false, message: 'You do not have access to this journal entry' });
+      }
+
+      // If changing entry type, check access to new type
+      if (entry_type_id && entry_type_id !== existingEntry.entry_type_id) {
+        const hasNewAccess = await JournalEntryTypeModel.checkUserAccess(user_id, entry_type_id);
+        if (!hasNewAccess) {
+          return res.status(403).json({ success: false, message: 'You do not have access to the new journal entry type' });
+        }
       }
 
       // Validation for type if provided
@@ -113,6 +165,7 @@ const journalEntryController = {
       }
 
       const updateData = {};
+      if (entry_type_id !== undefined) updateData.entry_type_id = parseInt(entry_type_id);
       if (date !== undefined) updateData.date = date;
       if (type !== undefined) updateData.type = type;
       if (customer_name !== undefined) updateData.customer_name = customer_name.trim();
@@ -144,9 +197,22 @@ const journalEntryController = {
   delete: async (req, res) => {
     try {
       const { id } = req.body;
+      const user_id = req.user?.id;
 
       if (!id) {
         return res.status(400).json({ success: false, message: 'Journal entry ID is required' });
+      }
+
+      // Get existing entry to check access
+      const existingEntry = await JournalEntryModel.getById(id);
+      if (!existingEntry) {
+        return res.status(404).json({ success: false, message: 'Journal entry not found' });
+      }
+
+      // Check if user has access to this entry's type
+      const hasAccess = await JournalEntryTypeModel.checkUserAccess(user_id, existingEntry.entry_type_id);
+      if (!hasAccess) {
+        return res.status(403).json({ success: false, message: 'You do not have access to this journal entry' });
       }
 
       const deleted = await JournalEntryModel.delete(id);
@@ -172,16 +238,28 @@ const journalEntryController = {
   // Get metrics (Total Receipts, Total Payments, Remaining Balance)
   getMetrics: async (req, res) => {
     try {
-      const { startDate, endDate } = req.body;
+      const { entry_type_id, startDate, endDate } = req.body;
+      const user_id = req.user?.id;
 
-      const filters = {};
+      // Validation - entry_type_id is required
+      if (!entry_type_id) {
+        return res.status(400).json({ success: false, message: 'Journal entry type ID is required' });
+      }
+
+      // Check if user has access to this entry type
+      const hasAccess = await JournalEntryTypeModel.checkUserAccess(user_id, entry_type_id);
+      if (!hasAccess) {
+        return res.status(403).json({ success: false, message: 'You do not have access to this journal entry type' });
+      }
+
+      const filters = { entry_type_id };
       if (startDate) filters.startDate = startDate;
       if (endDate) filters.endDate = endDate;
 
       const metrics = await JournalEntryModel.getMetrics(filters);
 
-      res.status(200).json({ 
-        success: true, 
+      res.status(200).json({
+        success: true,
         data: {
           total_receipts: metrics.total_receipts,
           total_payments: metrics.total_payments,

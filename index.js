@@ -41,6 +41,7 @@ const employeeWeeklySalaryRoutes = require('./route/employee_weekly_salary_route
 const employeeAdvanceRoutes = require('./route/employee_advance_route');
 const paymentMethodRoutes = require('./route/payment_method_route');
 const journalEntryRoutes = require('./route/journal_entry_route');
+const journalEntryTypeRoutes = require('./route/journal_entry_type_route');
 const journalCustomerRoutes = require('./route/journal_customer_route');
 const backupRoutes = require('./route/backup_route');
 const databaseRoutes = require('./route/database_route');
@@ -73,6 +74,7 @@ app.use('/employee-advances', employeeAdvanceRoutes);
 app.use('/employee-weekly-salary', employeeWeeklySalaryRoutes);
 app.use('/payment-methods', paymentMethodRoutes);
 app.use('/journal-entries', journalEntryRoutes);
+app.use('/journal-entry-types', journalEntryTypeRoutes);
 app.use('/journal-entries/customers', journalCustomerRoutes);
 app.use('/backup', backupRoutes);
 app.use('/database', databaseRoutes);
