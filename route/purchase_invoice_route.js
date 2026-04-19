@@ -45,6 +45,10 @@ router.post('/updatePurchaseInvoice', [authMiddleware, checkPermission('purchase
 
 // POST to delete invoice (id in body)
 router.post('/deletePurchaseInvoice', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.deleteInvoice);
+
+// POST to undo invoice (reverses stock and deletes invoice)
+router.post('/undoPurchaseInvoice', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.undoInvoice);
+
 // POST to batch delete multiple invoices (ids array in body)
 router.post('/batchDeletePurchaseInvoices', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.batchDeleteInvoices);
 router.post('/getDataFromInventoryItem', [authMiddleware, checkPermission('purchase_invoices')], purchaseInvoiceController.getInventoryDetailsByCodeUser);

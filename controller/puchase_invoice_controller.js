@@ -212,6 +212,37 @@ const purchaseInvoiceController = {
     }
   },
 
+  undoInvoice: async (req, res) => {
+    try {
+      const { id, reason } = req.body;
+      if (!id) {
+        return res.status(400).json({ success: false, message: 'Purchase invoice ID is required in the body.' });
+      }
+
+      const result = await PurchaseInvoice.undoInvoice(id, req.user?.id || null, reason || null);
+
+      if (!result.success) {
+        return res.status(404).json({ success: false, message: 'Purchase invoice not found' });
+      }
+
+      await logUserActivity(req, {
+        model_name: 'purchase_invoices',
+        action_type: 'DELETE',
+        record_id: id,
+        description: `Undo purchase invoice ${result.invoice_number || id}${reason ? `: ${reason}` : ''}`
+      });
+
+      res.status(200).json({
+        success: true,
+        message: 'Purchase invoice undo completed successfully.',
+        data: result
+      });
+    } catch (error) {
+      console.error('Error undoing purchase invoice:', error);
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
+
   // Batch delete multiple purchase invoices
   batchDeleteInvoices: async (req, res) => {
     try {

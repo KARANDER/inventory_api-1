@@ -239,6 +239,106 @@ const PurchaseInvoice = {
     return rows;
   },
 
+  undoInvoice: async (id, undoByUserId = null, undoReason = null) => {
+    const connection = await db.getConnection();
+    try {
+      await connection.beginTransaction();
+
+      // 1. Get the purchase invoice details
+      const [invoiceRows] = await connection.query(
+        `SELECT id, invoice_number, issue_date, user_code, total_amount
+         FROM purchase_invoices WHERE id = ? LIMIT 1 FOR UPDATE`,
+        [id]
+      );
+
+      if (invoiceRows.length === 0) {
+        await connection.rollback();
+        return { success: false, message: 'Purchase invoice not found' };
+      }
+
+      const invoice = invoiceRows[0];
+
+      // 2. Get all line items for this invoice
+      const [items] = await connection.query(
+        `SELECT code, total_psc, net_kg, total_kg
+         FROM purchase_invoice_items WHERE invoice_id = ? FOR UPDATE`,
+        [id]
+      );
+
+      // 3. Reverse stock for each item (DEBIT - remove stock that was added)
+      for (const item of items) {
+        const itemCode = item.code;
+        const totalPcs = parseFloat(item.total_psc) || 0;
+        const totalKg = parseFloat(item.net_kg || item.total_kg) || 0;
+
+        if (!itemCode || totalPcs <= 0) continue;
+
+        // Reverse the stock quantity and kg
+        await connection.query(
+          `UPDATE master_items
+           SET stock_quantity = stock_quantity - ?,
+               stock_kg = COALESCE(stock_kg, 0) - ?
+           WHERE item_code = ?`,
+          [totalPcs, totalKg, itemCode]
+        );
+
+        // Insert stock history (DEBIT - stock out via undo purchase invoice)
+        await connection.query(
+          `INSERT INTO stock_history
+          (item_code, transaction_type, invoice_type, invoice_number,
+           quantity_pcs, quantity_kg, movement_date, note, user_id)
+          VALUES (?, 'DEBIT', 'PURCHASE', ?, ?, ?, ?, ?, ?)`,
+          [
+            itemCode,
+            invoice.invoice_number || null,
+            totalPcs,
+            totalKg,
+            new Date(),
+            undoReason || `Undo purchase invoice ${invoice.invoice_number || id}`,
+            undoByUserId || null
+          ]
+        );
+      }
+
+      // 4. Reverse supplier's total amount
+      const userCode = invoice.user_code;
+      const totalAmount = parseFloat(invoice.total_amount) || 0;
+
+      if (userCode && totalAmount > 0) {
+        const [contactRows] = await connection.query(
+          'SELECT id FROM contacts WHERE code = ? AND type = "Supplier" LIMIT 1',
+          [userCode]
+        );
+
+        if (contactRows.length > 0) {
+          const contactId = contactRows[0].id;
+          await connection.query(
+            `UPDATE supplier_details
+             SET total_amount = COALESCE(total_amount, 0) - ?
+             WHERE contact_id = ?`,
+            [totalAmount, contactId]
+          );
+        }
+      }
+
+      // 5. Finally hard delete the purchase invoice (children auto-delete via FK)
+      const [deleteResult] = await connection.query('DELETE FROM purchase_invoices WHERE id = ?', [id]);
+
+      await connection.commit();
+      return {
+        success: true,
+        deletedCount: deleteResult.affectedRows,
+        reversedItems: items.length,
+        invoice_number: invoice.invoice_number
+      };
+    } catch (error) {
+      await connection.rollback();
+      throw error;
+    } finally {
+      connection.release();
+    }
+  },
+
   deleteInvoice: async (id) => {
     const [result] = await db.query('DELETE FROM purchase_invoices WHERE id = ?', [id]);
     return result.affectedRows;

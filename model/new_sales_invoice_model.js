@@ -254,7 +254,7 @@ const Invoice = {
           return sum + (parseFloat(item.net_kg) || 0);
         }, 0);
       }
-      invoice.total_net_kg = parseFloat(totalNetKg.toFixed(3));
+      invoice.total_net_kg = totalNetKg;
 
       const cartonsQuery = 'SELECT * FROM shipping_cartons WHERE invoice_id = ?';
       const [cartons] = await db.query(cartonsQuery, [invoice.id]);
@@ -904,10 +904,8 @@ const Invoice = {
         }
       }
 
-      // Format summary to 2 decimal places
-      for (const key in agingSummary) {
-        agingSummary[key] = parseFloat(agingSummary[key].toFixed(2));
-      }
+      // Return raw numeric values without rounding
+      // Frontend will handle display formatting
 
       // Step 4: Return both the list and the summary
       return {

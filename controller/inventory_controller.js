@@ -47,7 +47,7 @@ const applyRateAdjustment = ({ baseRate, rawAdjustment }) => {
 
   const finalRate = normalizedBase + adjustmentAmount;
   return {
-    calculatedRatePcs: Number(finalRate.toFixed(4)),
+    calculatedRatePcs: finalRate,
     normalizedAdjustment: text
   };
 };
