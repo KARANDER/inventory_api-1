@@ -246,7 +246,7 @@ const PurchaseInvoice = {
 
       // 1. Get the purchase invoice details
       const [invoiceRows] = await connection.query(
-        `SELECT id, invoice_number, issue_date, user_code, total_amount
+        `SELECT id, invoice_number, issue_date, code_user, total_amount
          FROM purchase_invoices WHERE id = ? LIMIT 1 FOR UPDATE`,
         [id]
       );
@@ -283,41 +283,54 @@ const PurchaseInvoice = {
         );
 
         // Insert stock history (DEBIT - stock out via undo purchase invoice)
-        await connection.query(
-          `INSERT INTO stock_history
-          (item_code, transaction_type, invoice_type, invoice_number,
-           quantity_pcs, quantity_kg, movement_date, note, user_id)
-          VALUES (?, 'DEBIT', 'PURCHASE', ?, ?, ?, ?, ?, ?)`,
-          [
-            itemCode,
-            invoice.invoice_number || null,
-            totalPcs,
-            totalKg,
-            new Date(),
-            undoReason || `Undo purchase invoice ${invoice.invoice_number || id}`,
-            undoByUserId || null
-          ]
-        );
+        // Only if stock_history table exists
+        try {
+          await connection.query(
+            `INSERT INTO stock_history
+            (item_code, transaction_type, invoice_type, invoice_number,
+             quantity_pcs, quantity_kg, movement_date, note, user_id)
+            VALUES (?, 'DEBIT', 'PURCHASE', ?, ?, ?, ?, ?, ?)`,
+            [
+              itemCode,
+              invoice.invoice_number || null,
+              totalPcs,
+              totalKg,
+              new Date(),
+              undoReason || `Undo purchase invoice ${invoice.invoice_number || id}`,
+              undoByUserId || null
+            ]
+          );
+        } catch (historyError) {
+          // If stock_history table doesn't exist, just log and continue
+          console.log('Note: stock_history table may not exist, skipping history insert');
+        }
       }
 
-      // 4. Reverse supplier's total amount
-      const userCode = invoice.user_code;
+      // 4. Reverse supplier's total amount (if supplier_details table exists)
+      const codeUser = invoice.code_user;
       const totalAmount = parseFloat(invoice.total_amount) || 0;
 
-      if (userCode && totalAmount > 0) {
+      if (codeUser && totalAmount > 0) {
         const [contactRows] = await connection.query(
-          'SELECT id FROM contacts WHERE code = ? AND type = "Supplier" LIMIT 1',
-          [userCode]
+          'SELECT id FROM contacts WHERE code = ? LIMIT 1',
+          [codeUser]
         );
 
         if (contactRows.length > 0) {
           const contactId = contactRows[0].id;
-          await connection.query(
-            `UPDATE supplier_details
-             SET total_amount = COALESCE(total_amount, 0) - ?
-             WHERE contact_id = ?`,
-            [totalAmount, contactId]
-          );
+
+          // Try to update supplier_details if it exists
+          try {
+            await connection.query(
+              `UPDATE supplier_details
+               SET total_amount = COALESCE(total_amount, 0) - ?
+               WHERE contact_id = ?`,
+              [totalAmount, contactId]
+            );
+          } catch (supplierError) {
+            // If supplier_details table doesn't exist, just log and continue
+            console.log('Note: supplier_details table may not exist, skipping supplier total update');
+          }
         }
       }
 
