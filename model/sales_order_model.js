@@ -153,7 +153,8 @@ const SalesOrder = {
         i.pcs_box,
         i.box_ctn,
         i.pcs_ctn,
-        i.kg_box
+        i.kg_box,
+        i.rate_pcs
       FROM inventory_items i
       WHERE i.code_user = ?
       LIMIT 1
