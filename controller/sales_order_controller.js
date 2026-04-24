@@ -7,12 +7,12 @@ const SalesLock = require('../model/sales_lock_model');
 const salesOrderController = {
   createOrder: async (req, res) => {
     try {
-      // Check if sales operations are locked
-      const isLocked = await SalesLock.isLocked();
+      // Check if sales orders module is locked
+      const isLocked = await SalesLock.isLocked('sales_orders');
       if (isLocked) {
         return res.status(403).json({
           success: false,
-          message: 'Sales operations are currently locked. Cannot create sales orders.'
+          message: 'Sales Orders are currently locked. Cannot create sales orders.'
         });
       }
 

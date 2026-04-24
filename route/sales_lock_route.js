@@ -3,10 +3,13 @@ const router = express.Router();
 const authenticateToken = require('../middlewares/auth');
 const salesLockController = require('../controller/sales_lock_controller');
 
-// Get current lock status
-router.get('/status', authenticateToken, salesLockController.getStatus);
+// Get all module lock statuses
+router.get('/all', authenticateToken, salesLockController.getAllStatuses);
 
-// Toggle lock ON/OFF
+// Get lock status for a specific module
+router.post('/status', authenticateToken, salesLockController.getStatus);
+
+// Toggle lock ON/OFF for a specific module
 router.post('/toggle', authenticateToken, salesLockController.toggleLock);
 
 module.exports = router;

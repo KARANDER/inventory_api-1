@@ -7,12 +7,12 @@ const invoiceController = {
   createInvoice: async (req, res) => {
     // Unchanged
     try {
-      // Check if sales operations are locked
-      const isLocked = await SalesLock.isLocked();
+      // Check if sales invoices module is locked
+      const isLocked = await SalesLock.isLocked('sales_invoices');
       if (isLocked) {
         return res.status(403).json({
           success: false,
-          message: 'Sales operations are currently locked. Cannot create sales invoices.'
+          message: 'Sales Invoices are currently locked. Cannot create sales invoices.'
         });
       }
 
