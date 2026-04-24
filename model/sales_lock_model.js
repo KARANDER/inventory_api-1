@@ -3,7 +3,7 @@ const db = require('../config/db');
 const SalesLock = {
     // Get all module lock statuses
     getAllStatuses: async () => {
-        const query = 'SELECT * FROM sales_lock ORDER BY module_name ASC';
+        const query = 'SELECT id, module_name, display_name, is_locked, locked_by, locked_at, unlocked_at FROM sales_lock ORDER BY id ASC';
         const [rows] = await db.query(query);
         return rows;
     },
@@ -12,7 +12,7 @@ const SalesLock = {
     getStatus: async (moduleName = 'all') => {
         const query = 'SELECT * FROM sales_lock WHERE module_name = ? LIMIT 1';
         const [rows] = await db.query(query, [moduleName]);
-        return rows[0] || { module_name: moduleName, is_locked: false };
+        return rows[0] || { module_name: moduleName, display_name: moduleName, is_locked: false };
     },
 
     // Toggle lock status for a specific module
@@ -33,10 +33,10 @@ const SalesLock = {
         } else {
             // Insert new record if none exists
             const query = `
-        INSERT INTO sales_lock (module_name, is_locked, locked_by, ${isLocked ? 'locked_at' : 'unlocked_at'}) 
-        VALUES (?, ?, ?, NOW())
+        INSERT INTO sales_lock (module_name, display_name, is_locked, locked_by, ${isLocked ? 'locked_at' : 'unlocked_at'}) 
+        VALUES (?, ?, ?, ?, NOW())
       `;
-            await db.query(query, [moduleName, isLocked, userId]);
+            await db.query(query, [moduleName, moduleName, isLocked, userId]);
         }
 
         return await SalesLock.getStatus(moduleName);
