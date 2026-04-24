@@ -45,7 +45,7 @@ const journalEntryTypeRoutes = require('./route/journal_entry_type_route');
 const journalCustomerRoutes = require('./route/journal_customer_route');
 const backupRoutes = require('./route/backup_route');
 const databaseRoutes = require('./route/database_route');
-// const salesLockRoutes = require('./route/sales_lock_route'); // TEMPORARILY DISABLED
+const salesLockRoutes = require('./route/sales_lock_route');
 
 const PORT = process.env.PORT || 3000;
 
@@ -79,7 +79,7 @@ app.use('/journal-entry-types', journalEntryTypeRoutes);
 app.use('/journal-entries/customers', journalCustomerRoutes);
 app.use('/backup', backupRoutes);
 app.use('/database', databaseRoutes);
-// app.use('/sales-lock', salesLockRoutes); // TEMPORARILY DISABLED
+app.use('/sales-lock', salesLockRoutes);
 
 // An async function to connect to the DB and then start the server
 const startServer = async () => {

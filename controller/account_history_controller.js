@@ -136,7 +136,7 @@ const accountHistoryController = {
 
       const history = await AccountHistory.findByAccountName(account_name, filters);
       const summary = await AccountHistory.getAccountSummaryByName(account_name, filters);
-      
+
       // Get account ID to fetch current balance
       const [accountRows] = await db.query('SELECT id, balance FROM accounts WHERE account_name = ?', [account_name]);
       const accountId = accountRows[0]?.id;
