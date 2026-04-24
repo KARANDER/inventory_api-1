@@ -1,6 +1,7 @@
 const PurchaseInvoice = require('../model/purchase_invoice_model');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 // Helper function to process invoice items with new calculation logic
 const processInvoiceItems = (items = []) => {
@@ -42,6 +43,15 @@ const processInvoiceItems = (items = []) => {
 const purchaseInvoiceController = {
   addInvoiceWithItems: async (req, res) => {
     try {
+      // Check if purchase invoices module is locked
+      const isLocked = await SalesLock.isLocked('purchase_invoices');
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Purchase Invoices are currently locked. Cannot create purchase invoices.'
+        });
+      }
+
       const { line_items, user_code, total_amount, ...invoiceData } = req.body;
 
       const processedItems = processInvoiceItems(line_items);

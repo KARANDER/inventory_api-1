@@ -1,9 +1,19 @@
 const Payment = require('../model/payment_model');
 const { logUserActivity } = require('../utils/activityLogger');
+const SalesLock = require('../model/sales_lock_model');
 
 const paymentController = {
   createPayment: async (req, res) => {
     try {
+      // Check if payments module is locked
+      const isLocked = await SalesLock.isLocked('payments');
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Payments are currently locked. Cannot create payments.'
+        });
+      }
+
       const user_id = req.user.id;
       const image_url = req.file ? req.file.path : null;
 

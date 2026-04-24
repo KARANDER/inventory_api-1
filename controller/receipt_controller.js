@@ -1,9 +1,19 @@
 const Receipt = require('../model/receipt_model');
 const { logUserActivity } = require('../utils/activityLogger');
+const SalesLock = require('../model/sales_lock_model');
 
 const receiptController = {
   createReceipt: async (req, res) => {
     try {
+      // Check if receipts module is locked
+      const isLocked = await SalesLock.isLocked('receipts');
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Receipts are currently locked. Cannot create receipts.'
+        });
+      }
+
       const user_id = req.user.id;
       const image_url = req.file ? req.file.path : null;
 

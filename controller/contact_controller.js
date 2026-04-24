@@ -1,10 +1,31 @@
 const Contact = require('../model/contact_model');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 const contactController = {
   createContact: async (req, res) => {
     try {
+      // Check lock based on contact type
+      const contactType = req.body.type;
+      if (contactType === 'Customer') {
+        const isLocked = await SalesLock.isLocked('customers');
+        if (isLocked) {
+          return res.status(403).json({
+            success: false,
+            message: 'Customers are currently locked. Cannot create customers.'
+          });
+        }
+      } else if (contactType === 'Supplier') {
+        const isLocked = await SalesLock.isLocked('suppliers');
+        if (isLocked) {
+          return res.status(403).json({
+            success: false,
+            message: 'Suppliers are currently locked. Cannot create suppliers.'
+          });
+        }
+      }
+
       const created_by = req.user.id;
 
       // The file path will be available in req.file.path
