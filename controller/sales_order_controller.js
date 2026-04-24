@@ -2,10 +2,20 @@ const SalesOrder = require('../model/sales_order_model');
 const db = require('../config/db');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 const salesOrderController = {
   createOrder: async (req, res) => {
     try {
+      // Check if sales operations are locked
+      const isLocked = await SalesLock.isLocked();
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Sales operations are currently locked. Cannot create sales orders.'
+        });
+      }
+
       const created_by = req.user.id;
       if (!created_by) {
         return res.status(400).json({ success: false, message: 'Created by user ID is required.' });

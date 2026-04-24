@@ -1,11 +1,21 @@
 const Invoice = require('../model/new_sales_invoice_model');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 const invoiceController = {
   createInvoice: async (req, res) => {
     // Unchanged
     try {
+      // Check if sales operations are locked
+      const isLocked = await SalesLock.isLocked();
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Sales operations are currently locked. Cannot create sales invoices.'
+        });
+      }
+
       console.log('--- Full Request Body Received in Controller ---');
       console.log(JSON.stringify(req.body, null, 2));
       const newInvoice = await Invoice.create(req.body);

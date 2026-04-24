@@ -2,10 +2,20 @@ const SalesInvoice = require('../model/sales_invoice_model');
 const db = require('../config/db');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 const salesInvoiceController = {
   createInvoice: async (req, res) => {
     try {
+      // Check if sales operations are locked
+      const isLocked = await SalesLock.isLocked();
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Sales operations are currently locked. Cannot create sales invoices.'
+        });
+      }
+
       const data = req.body;
 
       // Validate required fields (adjust as per your schema)
@@ -98,10 +108,10 @@ const salesInvoiceController = {
 
     } catch (error) {
       console.error('Get All Invoices Error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server error', 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
       });
     }
   },
@@ -111,23 +121,23 @@ const salesInvoiceController = {
       const { id, ...updateData } = req.body;
 
       if (!id) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Invoice ID is required for update.' 
+        return res.status(400).json({
+          success: false,
+          message: 'Invoice ID is required for update.'
         });
       }
 
       // Fetch old record before updating
       const oldRecord = await SalesInvoice.findById(id);
       if (!oldRecord) {
-        return res.status(404).json({ 
-          success: false, 
-          message: 'Sales invoice not found' 
+        return res.status(404).json({
+          success: false,
+          message: 'Sales invoice not found'
         });
       }
 
       const updated = await SalesInvoice.update(id, updateData);
-      
+
       // Compare old vs new values and log changes
       const changes = compareChanges(oldRecord, updateData);
       await logUserActivity(req, {
@@ -138,18 +148,18 @@ const salesInvoiceController = {
         changes: changes
       });
 
-      res.status(200).json({ 
-        success: true, 
-        message: 'Sales invoice updated successfully.', 
-        data: updated 
+      res.status(200).json({
+        success: true,
+        message: 'Sales invoice updated successfully.',
+        data: updated
       });
 
     } catch (error) {
       console.error('Update Invoice Error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server error', 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
       });
     }
   },
@@ -159,9 +169,9 @@ const salesInvoiceController = {
       const { id } = req.body;
 
       if (!id) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Invoice ID is required to delete.' 
+        return res.status(400).json({
+          success: false,
+          message: 'Invoice ID is required to delete.'
         });
       }
 
@@ -173,91 +183,91 @@ const salesInvoiceController = {
         description: 'Deleted sales invoice'
       });
 
-      res.status(200).json({ 
-        success: true, 
-        message: 'Sales invoice deleted successfully.' 
+      res.status(200).json({
+        success: true,
+        message: 'Sales invoice deleted successfully.'
       });
 
     } catch (error) {
       console.error('Delete Invoice Error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server error', 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
       });
     }
   },
   getDistinctCustomerNames: async (req, res) => {
-  try {
-    const names = await SalesInvoice.getDistinctCustomerNames();
-    res.status(200).json({ success: true, data: names, count: names.length });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-  }
-},
-findFinishNoteByCustomerName: async (req, res) => {
-  try {
-    const { customer_name } = req.body;
-    if (!customer_name) {
-      return res.status(400).json({ success: false, message: 'customer_name is required' });
+    try {
+      const names = await SalesInvoice.getDistinctCustomerNames();
+      res.status(200).json({ success: true, data: names, count: names.length });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
     }
-    const results = await SalesInvoice.findFinishNoteByCustomerName(customer_name);
-    res.status(200).json({ success: true, data: results, count: results.length });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Server Error', error: error.message });
-  }
-},
+  },
+  findFinishNoteByCustomerName: async (req, res) => {
+    try {
+      const { customer_name } = req.body;
+      if (!customer_name) {
+        return res.status(400).json({ success: false, message: 'customer_name is required' });
+      }
+      const results = await SalesInvoice.findFinishNoteByCustomerName(customer_name);
+      res.status(200).json({ success: true, data: results, count: results.length });
+    } catch (error) {
+      res.status(500).json({ success: false, message: 'Server Error', error: error.message });
+    }
+  },
 
-getUnfinishedFinishesForCustomer: async (req, res) => {
-  try {
-    // Input is 'code_user' which maps to customer_id
-    const { code_user } = req.body;
+  getUnfinishedFinishesForCustomer: async (req, res) => {
+    try {
+      // Input is 'code_user' which maps to customer_id
+      const { code_user } = req.body;
 
-    if (!code_user) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'code_user is required in the request body.' 
+      if (!code_user) {
+        return res.status(400).json({
+          success: false,
+          message: 'code_user is required in the request body.'
+        });
+      }
+
+      const unfinishedFinishes = await SalesInvoice.findUnfinishedFinishesByCustomerId(code_user);
+
+      res.status(200).json({ success: true, data: unfinishedFinishes });
+
+    } catch (error) {
+      console.error('Error in getUnfinishedFinishesForCustomer:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
       });
     }
-
-    const unfinishedFinishes = await SalesInvoice.findUnfinishedFinishesByCustomerId(code_user);
-
-    res.status(200).json({ success: true, data: unfinishedFinishes });
-
-  } catch (error) {
-    console.error('Error in getUnfinishedFinishesForCustomer:', error);
-    res.status(500).json({ 
-      success: false, 
-      message: 'Server Error', 
-      error: error.message 
-    });
-  }
-},
-findInvoiceByNumber: async (req, res) => {
+  },
+  findInvoiceByNumber: async (req, res) => {
     try {
       const { invoice_no } = req.body;
 
       if (!invoice_no) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'invoice_no is required in the request body.' 
+        return res.status(400).json({
+          success: false,
+          message: 'invoice_no is required in the request body.'
         });
       }
 
       const invoices = await SalesInvoice.findByInvoiceNo(invoice_no);
 
-      res.status(200).json({ 
-        success: true, 
-        data: invoices, 
-        count: invoices.length 
+      res.status(200).json({
+        success: true,
+        data: invoices,
+        count: invoices.length
       });
 
     } catch (error) {
       console.error('Error in findInvoiceByNumber:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server Error', 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        message: 'Server Error',
+        error: error.message
       });
     }
   },
@@ -289,10 +299,10 @@ findInvoiceByNumber: async (req, res) => {
 
     } catch (error) {
       console.error('Get Invoice Summary Error:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Server error', 
-        error: error.message 
+      res.status(500).json({
+        success: false,
+        message: 'Server error',
+        error: error.message
       });
     }
   },
