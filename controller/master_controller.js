@@ -3,10 +3,20 @@ const InventoryItem = require('../model/inventory_model');
 const db = require('../config/db');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 const masterController = {
   createItem: async (req, res) => {
     try {
+      // Check if master items module is locked
+      const isLocked = await SalesLock.isLocked('master_items');
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Master Product is currently locked. Cannot create master items.'
+        });
+      }
+
       const created_by = req.user.id;
       const newItem = await MasterItem.create({ ...req.body, created_by });
       await logUserActivity(req, {

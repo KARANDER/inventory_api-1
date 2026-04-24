@@ -1,11 +1,21 @@
 const JournalEntryModel = require('../model/journal_entry_model');
 const JournalEntryTypeModel = require('../model/journal_entry_type_model');
 const { logUserActivity } = require('../utils/activityLogger');
+const SalesLock = require('../model/sales_lock_model');
 
 const journalEntryController = {
   // Create new journal entry
   create: async (req, res) => {
     try {
+      // Check if journal entries module is locked
+      const isLocked = await SalesLock.isLocked('journal_entries');
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Journal Entries are currently locked. Cannot create journal entries.'
+        });
+      }
+
       const { entry_type_id, date, type, customer_name, method_id, amount, notes } = req.body;
       const user_id = req.user?.id;
 

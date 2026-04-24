@@ -1,10 +1,20 @@
 const Account = require('../model/account_model');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 const accountController = {
   createAccount: async (req, res) => {
     try {
+      // Check if accounts module is locked
+      const isLocked = await SalesLock.isLocked('accounts');
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Bank and Cash Accounts are currently locked. Cannot create accounts.'
+        });
+      }
+
       const created_by = req.user.id;
       const newAccount = await Account.create({ ...req.body, created_by });
       // Log activity: account created

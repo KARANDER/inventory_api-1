@@ -2,6 +2,7 @@ const InventoryItem = require('../model/inventory_model');
 const db = require('../config/db');
 const { logUserActivity } = require('../utils/activityLogger');
 const { compareChanges } = require('../utils/compareChanges');
+const SalesLock = require('../model/sales_lock_model');
 
 const toNum = (value) => {
   const n = parseFloat(value);
@@ -147,6 +148,15 @@ const formatItemForResponse = (item) => ({
 const inventoryController = {
   createItem: async (req, res) => {
     try {
+      // Check if inventory items module is locked
+      const isLocked = await SalesLock.isLocked('inventory_items');
+      if (isLocked) {
+        return res.status(403).json({
+          success: false,
+          message: 'Inventory Items are currently locked. Cannot create inventory items.'
+        });
+      }
+
       const createdBy = req.user.id;
       const { item_code, user, stock_quantity, rate_adjustment, ...otherData } = req.body;
 

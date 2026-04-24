@@ -2,6 +2,7 @@
 
 const EmployeeModel = require('../model/employee_model');
 const { logUserActivity } = require('../utils/activityLogger');
+const SalesLock = require('../model/sales_lock_model');
 
 const employeeController = {
 
@@ -9,6 +10,15 @@ const employeeController = {
 
     createEmployee: async (req, res) => {
         try {
+            // Check if employees module is locked
+            const isLocked = await SalesLock.isLocked('employees');
+            if (isLocked) {
+                return res.status(403).json({
+                    success: false,
+                    message: 'Employees are currently locked. Cannot create employees.'
+                });
+            }
+
             const createdBy = req.user.id;
             const employeeData = { ...req.body, };
             const profileFile = req.files && req.files['profile_photo'] ? req.files['profile_photo'][0] : null;
