@@ -3,6 +3,7 @@ const router = express.Router();
 const journalEntryController = require('../controller/journal_entry_controller');
 const authMiddleware = require('../middlewares/auth');
 const checkPermission = require('../middlewares/checkPermission');
+const upload = require('../middlewares/upload');
 
 // All routes require authentication
 router.use(authMiddleware);
@@ -16,11 +17,11 @@ router.post('/getAll', checkPermission(permission), journalEntryController.getAl
 // Get journal entry by ID
 router.post('/getById', checkPermission(permission), journalEntryController.getById);
 
-// Create new journal entry
-router.post('/', checkPermission(permission), journalEntryController.create);
+// Create new journal entry (with file upload)
+router.post('/', checkPermission(permission), upload.single('attachment'), journalEntryController.create);
 
-// Update journal entry
-router.post('/update', checkPermission(permission), journalEntryController.update);
+// Update journal entry (with file upload)
+router.post('/update', checkPermission(permission), upload.single('attachment'), journalEntryController.update);
 
 // Delete journal entry
 router.post('/delete', checkPermission(permission), journalEntryController.delete);
@@ -29,5 +30,3 @@ router.post('/delete', checkPermission(permission), journalEntryController.delet
 router.post('/getMetrics', checkPermission(permission), journalEntryController.getMetrics);
 
 module.exports = router;
-
-

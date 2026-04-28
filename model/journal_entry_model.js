@@ -3,12 +3,26 @@ const db = require('../config/db');
 const JournalEntryModel = {
   // Create new journal entry
   create: async (entryData) => {
-    const { entry_type_id, date, type, customer_name, method_id, amount, notes, user_id } = entryData;
+    const { entry_type_id, date, type, customer_name, method_id, amount, notes, note_1, note_2, note_3, note_4, attachment, user_id } = entryData;
     const query = `
-      INSERT INTO journal_entries (entry_type_id, date, type, customer_name, method_id, amount, notes, user_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO journal_entries (entry_type_id, date, type, customer_name, method_id, amount, notes, note_1, note_2, note_3, note_4, attachment, user_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
-    const [result] = await db.query(query, [entry_type_id, date, type, customer_name, method_id, amount, notes || null, user_id]);
+    const [result] = await db.query(query, [
+      entry_type_id,
+      date,
+      type,
+      customer_name,
+      method_id,
+      amount,
+      notes || null,
+      note_1 || null,
+      note_2 || null,
+      note_3 || null,
+      note_4 || null,
+      attachment || null,
+      user_id
+    ]);
     return await JournalEntryModel.getById(result.insertId);
   },
 
@@ -33,9 +47,9 @@ const JournalEntryModel = {
     }
 
     if (filters.search) {
-      query += ' AND (je.customer_name LIKE ? OR pm.name LIKE ?)';
+      query += ' AND (je.customer_name LIKE ? OR pm.name LIKE ? OR je.notes LIKE ? OR je.note_1 LIKE ? OR je.note_2 LIKE ? OR je.note_3 LIKE ? OR je.note_4 LIKE ?)';
       const searchTerm = `%${filters.search}%`;
-      params.push(searchTerm, searchTerm);
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     if (filters.type) {
@@ -82,7 +96,7 @@ const JournalEntryModel = {
 
   // Update journal entry
   update: async (id, entryData) => {
-    const { entry_type_id, date, type, customer_name, method_id, amount, notes } = entryData;
+    const { entry_type_id, date, type, customer_name, method_id, amount, notes, note_1, note_2, note_3, note_4, attachment } = entryData;
     const updateKeys = [];
     const updateValues = [];
 
@@ -114,6 +128,26 @@ const JournalEntryModel = {
       updateKeys.push('notes = ?');
       updateValues.push(notes || null);
     }
+    if (note_1 !== undefined) {
+      updateKeys.push('note_1 = ?');
+      updateValues.push(note_1 || null);
+    }
+    if (note_2 !== undefined) {
+      updateKeys.push('note_2 = ?');
+      updateValues.push(note_2 || null);
+    }
+    if (note_3 !== undefined) {
+      updateKeys.push('note_3 = ?');
+      updateValues.push(note_3 || null);
+    }
+    if (note_4 !== undefined) {
+      updateKeys.push('note_4 = ?');
+      updateValues.push(note_4 || null);
+    }
+    if (attachment !== undefined) {
+      updateKeys.push('attachment = ?');
+      updateValues.push(attachment || null);
+    }
 
     if (updateKeys.length === 0) {
       return await JournalEntryModel.getById(id);
@@ -137,12 +171,12 @@ const JournalEntryModel = {
     return result.affectedRows > 0;
   },
 
-  // Get metrics (Total Receipts, Total Payments, Remaining Balance)
+  // Get metrics (Total Receipts, Total Payments from note_2, Remaining Balance)
   getMetrics: async (filters = {}) => {
     let query = `
       SELECT 
-        COALESCE(SUM(CASE WHEN type = 'Receipt' THEN amount ELSE 0 END), 0) as total_receipts,
-        COALESCE(SUM(CASE WHEN type = 'Payment' THEN amount ELSE 0 END), 0) as total_payments
+        COALESCE(SUM(CASE WHEN type = 'Receipt' THEN note_2 ELSE 0 END), 0) as total_receipts,
+        COALESCE(SUM(CASE WHEN type = 'Payment' THEN note_2 ELSE 0 END), 0) as total_payments
       FROM journal_entries
       WHERE 1=1
     `;
@@ -152,6 +186,12 @@ const JournalEntryModel = {
     if (filters.entry_type_id) {
       query += ' AND entry_type_id = ?';
       params.push(filters.entry_type_id);
+    }
+
+    if (filters.search) {
+      query += ' AND (customer_name LIKE ? OR notes LIKE ? OR note_1 LIKE ? OR note_2 LIKE ? OR note_3 LIKE ? OR note_4 LIKE ?)';
+      const searchTerm = `%${filters.search}%`;
+      params.push(searchTerm, searchTerm, searchTerm, searchTerm, searchTerm, searchTerm);
     }
 
     if (filters.startDate) {

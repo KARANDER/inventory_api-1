@@ -16,8 +16,11 @@ const journalEntryController = {
         });
       }
 
-      const { entry_type_id, date, type, customer_name, method_id, amount, notes } = req.body;
+      const { entry_type_id, date, type, customer_name, method_id, amount, notes, note_1, note_2, note_3, note_4 } = req.body;
       const user_id = req.user?.id;
+
+      // Handle file upload
+      const attachment = req.file ? req.file.path : null;
 
       // Validation
       if (!entry_type_id) {
@@ -54,6 +57,11 @@ const journalEntryController = {
         method_id: parseInt(method_id),
         amount: parseFloat(amount),
         notes: notes || null,
+        note_1: note_1 || null,
+        note_2: note_2 || null,
+        note_3: note_3 || null,
+        note_4: note_4 || null,
+        attachment: attachment,
         user_id
       };
 
@@ -137,8 +145,11 @@ const journalEntryController = {
   // Update journal entry
   update: async (req, res) => {
     try {
-      const { id, entry_type_id, date, type, customer_name, method_id, amount, notes } = req.body;
+      const { id, entry_type_id, date, type, customer_name, method_id, amount, notes, note_1, note_2, note_3, note_4 } = req.body;
       const user_id = req.user?.id;
+
+      // Handle file upload
+      const attachment = req.file ? req.file.path : undefined;
 
       if (!id) {
         return res.status(400).json({ success: false, message: 'Journal entry ID is required' });
@@ -182,6 +193,11 @@ const journalEntryController = {
       if (method_id !== undefined) updateData.method_id = parseInt(method_id);
       if (amount !== undefined) updateData.amount = parseFloat(amount);
       if (notes !== undefined) updateData.notes = notes || null;
+      if (note_1 !== undefined) updateData.note_1 = note_1 || null;
+      if (note_2 !== undefined) updateData.note_2 = note_2 || null;
+      if (note_3 !== undefined) updateData.note_3 = note_3 || null;
+      if (note_4 !== undefined) updateData.note_4 = note_4 || null;
+      if (attachment !== undefined) updateData.attachment = attachment;
 
       const updatedEntry = await JournalEntryModel.update(id, updateData);
 
@@ -248,7 +264,7 @@ const journalEntryController = {
   // Get metrics (Total Receipts, Total Payments, Remaining Balance)
   getMetrics: async (req, res) => {
     try {
-      const { entry_type_id, startDate, endDate } = req.body;
+      const { entry_type_id, search, startDate, endDate } = req.body;
       const user_id = req.user?.id;
 
       // Validation - entry_type_id is required
@@ -263,6 +279,7 @@ const journalEntryController = {
       }
 
       const filters = { entry_type_id };
+      if (search) filters.search = search;
       if (startDate) filters.startDate = startDate;
       if (endDate) filters.endDate = endDate;
 

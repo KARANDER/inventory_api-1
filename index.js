@@ -1,6 +1,7 @@
 require('dotenv').config(); // MUST be the very first line
 const cors = require('cors'); // ✅ ADD THIS LINE
 const express = require('express');
+const path = require('path');
 const app = express(); // Import the configured Express application
 const db = require('./config/db'); // Import the database pool
 const userRoutes = require('./route/user_route');
@@ -17,6 +18,9 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true, // allow cookies / auth headers
 }));
+
+// ✅ Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const accountRoutes = require('./route/account_route');
 const accountHistoryRoutes = require('./route/account_history_route');
