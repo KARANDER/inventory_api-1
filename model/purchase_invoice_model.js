@@ -358,7 +358,7 @@ const PurchaseInvoice = {
   },
 
   getDetailsByCodeUser: async (codeUser) => {
-    const query = 'SELECT scrap, labour, kg_dzn, total_kg, description FROM inventory_items WHERE code_user = ? LIMIT 1';
+    const query = 'SELECT scrap, labour, kg_dzn, total_kg, description, rate_pcs FROM inventory_items WHERE code_user = ? LIMIT 1';
     const [rows] = await db.query(query, [codeUser]);
     return rows.length ? rows[0] : null;
   },

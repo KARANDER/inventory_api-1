@@ -128,7 +128,8 @@ const SalesInvoice = {
       scrap,
       labour,
       pcs_box,
-      note 
+      note,
+      rate_pcs
     FROM sales_orders 
     WHERE customer_id = ? AND (invoice_status IS NULL OR invoice_status != 'completed')
   `;
