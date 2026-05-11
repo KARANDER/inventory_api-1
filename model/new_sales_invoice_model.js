@@ -158,8 +158,15 @@ const Invoice = {
               );
               total_pcs_to_invoice -= amount_to_subtract;
             }
+            // If invoiced quantity exceeds total ordered quantity, mark as 'over_invoiced'
+            // (do NOT throw an error — over-invoicing is allowed)
             if (total_pcs_to_invoice > 0) {
-              throw new Error(`Insufficient quantity in sales orders for item ${item_code}. Short by ${total_pcs_to_invoice} pcs.`);
+              await connection.query(
+                `UPDATE sales_orders
+                 SET invoice_status = 'over_invoiced'
+                 WHERE item_code = ? AND finish = ? AND (customer_code = ? OR customer_id = ?)`,
+                [item_code, item_finish, invoiceData.customer_id, invoiceData.customer_id]
+              );
             }
           }
         }

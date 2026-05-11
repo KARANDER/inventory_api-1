@@ -36,13 +36,17 @@ ALTER TABLE inventory_items
 ALTER TABLE sales_orders 
   MODIFY COLUMN quantity_pcs DECIMAL(15, 6),
   MODIFY COLUMN rate_kz DECIMAL(15, 6),
-  MODIFY COLUMN initial_qty DECIMAL(15, 6);
+  MODIFY COLUMN initial_qty DECIMAL(15, 6),
+  MODIFY COLUMN rate_pcs DECIMAL(15, 6),
+  MODIFY COLUMN scrap DECIMAL(15, 6),
+  MODIFY COLUMN labour DECIMAL(15, 6),
+  MODIFY COLUMN kg_box DECIMAL(15, 6);
 
 -- ============================================
 -- 4. INVOICES TABLE (Sales Invoices)
 -- ============================================
+-- NOTE: total_net_kg does not exist in this table, removed to avoid #1054 error
 ALTER TABLE invoices 
-  MODIFY COLUMN total_net_kg DECIMAL(15, 6),
   MODIFY COLUMN grand_total DECIMAL(15, 2),
   MODIFY COLUMN reference_no_1 DECIMAL(15, 6),
   MODIFY COLUMN reference_no_2 DECIMAL(15, 6),
@@ -51,12 +55,17 @@ ALTER TABLE invoices
 -- ============================================
 -- 5. INVOICE ITEMS TABLE
 -- ============================================
+-- Actual columns (verified from schema):
+--   pcs_rate DECIMAL(10,2)  → upgrade to DECIMAL(15,6)
+--   rate_kg  DECIMAL(10,2)  → upgrade to DECIMAL(15,6)
+--   net_kg   DECIMAL(10,3)  → upgrade to DECIMAL(15,6)
+--   total_pcs is INT — skipped (not a decimal column)
+--   rate_pcs does NOT exist (column is named pcs_rate)
+--   amount   does NOT exist in this table
 ALTER TABLE invoice_items 
-  MODIFY COLUMN total_pcs DECIMAL(15, 6),
-  MODIFY COLUMN net_kg DECIMAL(15, 6),
-  MODIFY COLUMN rate_pcs DECIMAL(15, 6),
-  MODIFY COLUMN rate_kg DECIMAL(15, 6),
-  MODIFY COLUMN amount DECIMAL(15, 2);
+  MODIFY COLUMN pcs_rate DECIMAL(15, 6),
+  MODIFY COLUMN rate_kg  DECIMAL(15, 6),
+  MODIFY COLUMN net_kg   DECIMAL(15, 6);
 
 -- ============================================
 -- 6. PURCHASE INVOICES TABLE
